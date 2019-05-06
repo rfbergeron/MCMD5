@@ -65,7 +65,7 @@ public class MD5Model {
         private IResourceManager manager;
         private ResourceLocation location;
         private InputStream inputStream;
-        private byte[] buffer;
+        BufferedReader bufferedReader;
 
         public Parser(InputStream in, IResourceManager manager, ResourceLocation location) throws IOException
         {
@@ -81,9 +81,14 @@ public class MD5Model {
             if(Mcmd5.debug)
                 Mcmd5.logger.log(Level.INFO, "Parsing");
             try{
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
+                bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
                 for(String line ; (line = bufferedReader.readLine()) != null; ) {
+                    if(line.contains("mesh")) {
 
+                    }
+                    else if(line.contains("joints")) {
+
+                    }
                 }
                 return  null;
             }
@@ -96,8 +101,56 @@ public class MD5Model {
             }*/
         }
 
-        public void interpret(String line) {
-            
+        private void parseMesh() {
+            Vertex[] verts;
+            Triangle[] tris;
+            Weight[] weights;
+            int vertcount = 0;
+            int tricount = 0;
+            int weightcount = 0;
+
+            for(String line ; !(line = bufferedReader.readLine()).contains("}"); ) {
+                if(line.contains("shader")) {
+
+                }
+                else if(line.contains("numverts")) {
+                    int numverts = Integer.parseInt(line.split(" ")[1]);
+                    verts = new Vertex[numverts];
+                }
+                else if(line.contains("numtris")) {
+                    int numtris = Integer.parseInt(line.split(" ")[1]);
+                    tris = new Triangle[numtris];
+                }
+                else if(line.contains("numweights")) {
+                    int numweights = Integer.parseInt(line.split(" ")[1]);
+                    weights = new Weight[numweights];
+                }
+                else if(line.contains("tri")) {
+                    String[] triData = line.split(" ");
+                    int index = verts[Integer.parseInt(triData[1])];
+                    Vertex v1 = verts[Integer.parseInt(triData[2])];
+                    Vertex v2 = verts[Integer.parseInt(triData[1])];
+                    Vertex v3 = verts[Integer.parseInt(triData[1])];
+                    Triangle[tricount] = new Triangle();
+                }
+                else if(line.contains("vert")) {
+                    String[] vertData = line.split(" ");
+                    int index = Integer.parseInt(vertData[1]);
+                    float u = Float.parseFloat(vertData[3]);
+                    float v = Float.parseFloat(vertData[4]);
+                    int weightstart = Integer.parseInt(vertData[6]);
+                    int numweights = Integer.parseInt(vertData[7]);
+                    
+
+                }
+                else if(line.contains("weight")) {
+                    String[] weightData = line.split(" ");
+                }
+            }
+        }
+
+        private void parseJoints() {
+
         }
     }
 
