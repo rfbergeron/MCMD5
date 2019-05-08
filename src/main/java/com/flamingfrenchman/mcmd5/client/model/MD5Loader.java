@@ -40,6 +40,7 @@ import org.apache.logging.log4j.Level;
 
 import javax.annotation.Nullable;
 import javax.vecmath.Matrix4f;
+import javax.vecmath.Vector2f;
 import javax.vecmath.Vector3f;
 import java.io.FileNotFoundException;
 import java.util.*;
@@ -139,6 +140,8 @@ public enum MD5Loader implements ICustomModelLoader {
     private static final class ModelWrapper implements IModel {
         private final ResourceLocation modelLocation;
         private final MD5Model model;
+        private final ImmutableList<WrappedMesh> meshes;
+        private final ImmutableMap<String, ResourceLocation> textures;
         private final boolean smooth;
         private final boolean gui3d;
         private final int defaultKey;
@@ -150,12 +153,37 @@ public enum MD5Loader implements ICustomModelLoader {
             this.smooth = smooth;
             this.gui3d = gui3d;
             this.defaultKey = defaultKey;
+            this.textures = buildTextures(model.getMeshes());
+            this.meshes = processMeshes(model);
+        }
+
+        private static ImmutableMap<String, ResourceLocation> buildTextures(ImmutableList<MD5Model.Mesh> meshes)
+        {
+            ImmutableMap.Builder<String, ResourceLocation> builder = ImmutableMap.builder();
+
+            for(MD5Model.Mesh mesh : meshes) {
+                String path = mesh.getTexture();
+                String location = getLocation(path);
+                builder.put(path, new ResourceLocation(location));
+            }
+            return builder.build();
+        }
+
+        private static ImmutableList<WrappedMesh> processMeshes(MD5Model model) {
+
+        }
+
+        private static String getLocation(String path)
+        {
+            if(path.endsWith(".png")) path = path.substring(0, path.length() - ".png".length());
+            return path;
         }
 
         public Collection<ResourceLocation> getTextures() {
             ImmutableList.Builder<ResourceLocation> locationBuilder = ImmutableList.builder();
-            for(String key : model.getImages().keySet()) {
-                locationBuilder.add(new ResourceLocation(modelLocation.getResourceDomain(), model.getImages().get(key).getPath()));
+            for(MD5Model.Mesh mesh : model.getMeshes()) {
+                String key = mesh.getTexture();
+                locationBuilder.add(new ResourceLocation(modelLocation.getResourceDomain(), key));
             }
             return locationBuilder.build();
         }
@@ -165,23 +193,23 @@ public enum MD5Loader implements ICustomModelLoader {
         {
             ImmutableMap.Builder<String, TextureAtlasSprite> builder = ImmutableMap.builder();
             TextureAtlasSprite missing = bakedTextureGetter.apply(new ResourceLocation("missingno"));
-            for(Map.Entry<String, MD5Model.Image> e : model.getImages().entrySet())
+            for(Map.Entry<String, ResourceLocation> e : textures.entrySet())
             {
-                if(e.getValue().getPath().startsWith("#"))
+                if(e.getValue().getResourcePath().startsWith("#"))
                 {
-                    FMLLog.log.fatal("unresolved texture '{}' for b3d model '{}'", e.getValue().getPath(), modelLocation);
+                    FMLLog.log.fatal("unresolved texture '{}' for b3d model '{}'", e.getValue().getResourcePath(), modelLocation);
                     builder.put(e.getKey(), missing);
                 }
                 else
                 {
-                    Mcmd5.logger.log(Level.INFO, "adding sprite with path " + e.getValue().getPath());
-                    if(bakedTextureGetter.apply(new ResourceLocation(e.getValue().getPath())) == null)
+                    Mcmd5.logger.log(Level.INFO, "adding sprite with path " + e.getValue().getResourcePath());
+                    if(bakedTextureGetter.apply(new ResourceLocation(e.getValue().getResourcePath())) == null)
                         Mcmd5.logger.log(Level.INFO, "sprite not found, oopsie");
-                    builder.put(e.getKey(), bakedTextureGetter.apply(new ResourceLocation(e.getValue().getPath())));
+                    builder.put(e.getKey(), bakedTextureGetter.apply(new ResourceLocation(e.getValue().getResourcePath())));
                 }
             }
             builder.put("missingno", missing);
-            return new BakedWrapper(model.getScene(), state, smooth, gui3d, format, model.getGeometries(), builder.build());
+            return new BakedWrapper(model.getMeshes(), model.getJoints(), state, smooth, gui3d, format, builder.build());
         }
 
         public IModelState getDefaultState() {
@@ -213,30 +241,37 @@ public enum MD5Loader implements ICustomModelLoader {
         }
     }
 
+    private static final class WrappedMesh {
+
+    }
+
+    private static final class WrappedVertex {
+        private final Vector3f pos;
+        private final Vector3f norm;
+        private final Vector2f texCoords;
+    }
 
     private static final class BakedWrapper implements IBakedModel {
-        private final ImmutableMap<String, MD5Model.Geometry> geometries;
-        //private final ImmutableMap<String, MD5Model.Image> images;
-        private final MD5Model.Node scene;
+        private final ImmutableList<MD5Model.Mesh> meshes;
+        private final ImmutableList<MD5Model.Joint> joints;
         private final IModelState state;
         private final boolean smooth;
         private final boolean gui3d;
         private final VertexFormat format;
-        //private final ImmutableSet<String> meshes;
         private final ImmutableMap<String, TextureAtlasSprite> textures;
 
         // this should be the default state (animation/pose) for this model
         // not sure when this is first created
         private ImmutableList<BakedQuad> quads;
 
-        public BakedWrapper(MD5Model.Node scene, IModelState state, boolean smooth, boolean gui3d, VertexFormat format,
-                            ImmutableMap<String, MD5Model.Geometry> geometries, ImmutableMap<String, TextureAtlasSprite> textures) {
-            this.scene = scene;
+        public BakedWrapper(ImmutableList<MD5Model.Mesh> meshes, ImmutableList<MD5Model.Joint> joints, IModelState state,
+                            boolean smooth, boolean gui3d, VertexFormat format, ImmutableMap<String, TextureAtlasSprite> textures) {
+            this.meshes = meshes;
+            this.joints = joints;
             this.state = state;
             this.smooth = smooth;
             this.gui3d = gui3d;
             this.format = format;
-            this.geometries = geometries;
             this.textures = textures;
         }
 
@@ -274,20 +309,20 @@ public enum MD5Loader implements ICustomModelLoader {
             if(quads == null)
             {
                 ImmutableList.Builder<BakedQuad> builder = ImmutableList.builder();
-                generateQuads(builder, scene, this.state, ImmutableList.of());
+                generateQuads(builder, meshes, this.state, ImmutableList.of());
                 quads = builder.build();
             }
             // TODO: caching?
             if(this.state != modelState)
             {
                 ImmutableList.Builder<BakedQuad> builder = ImmutableList.builder();
-                generateQuads(builder, scene, modelState, ImmutableList.of());
+                generateQuads(builder, meshes, modelState, ImmutableList.of());
                 return builder.build();
             }
             return quads;
         }
 
-        private void generateQuads(ImmutableList.Builder<BakedQuad> builder, MD5Model.Node node, final IModelState state, ImmutableList<String> path)
+        private void generateQuads(ImmutableList.Builder<BakedQuad> builder, ImmutableList<MD5Model.Mesh> meshes, final IModelState state, ImmutableList<String> path)
         {
             ImmutableList.Builder<String> pathBuilder = ImmutableList.builder();
             pathBuilder.addAll(path);
