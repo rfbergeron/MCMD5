@@ -40,6 +40,7 @@ import org.apache.logging.log4j.Level;
 
 import javax.annotation.Nullable;
 import javax.vecmath.Matrix4f;
+import javax.vecmath.Quat4f;
 import javax.vecmath.Vector2f;
 import javax.vecmath.Vector3f;
 import java.io.FileNotFoundException;
@@ -154,7 +155,7 @@ public enum MD5Loader implements ICustomModelLoader {
             this.gui3d = gui3d;
             this.defaultKey = defaultKey;
             this.textures = buildTextures(model.getMeshes());
-            this.meshes = processMeshes(model);
+            this.meshes = process(model);
         }
 
         private static ImmutableMap<String, ResourceLocation> buildTextures(ImmutableList<MD5Model.Mesh> meshes)
@@ -169,8 +170,82 @@ public enum MD5Loader implements ICustomModelLoader {
             return builder.build();
         }
 
-        private static ImmutableList<WrappedMesh> processMeshes(MD5Model model) {
+        private static ImmutableList<WrappedMesh> process(MD5Model model) {
+            ImmutableList.Builder<WrappedMesh> builder = ImmutableList.builder();
+            for(MD5Model.Mesh mesh : model.getMeshes()) {
+                builder.add(generateWrappedMesh(model, mesh));
+            }
+            return builder.build();
+        }
 
+        private static WrappedMesh generateWrappedMesh(MD5Model model, MD5Model.Mesh mesh) {
+            List<WrappedVertex> wrappedVertices = new ArrayList<>();
+            ImmutableList.Builder<Integer> indices = ImmutableList.builder();
+            MD5Model.Vertex[] vertices = mesh.getVertices();
+            MD5Model.Weight[] weights = mesh.getWeights();
+            ImmutableList<MD5Model.Joint> joints = model.getJoints();
+
+            ImmutableList.Builder<Vector3f> posBuilder = ImmutableList.builder();
+            ImmutableList.Builder<Vector3f> normBuilder = ImmutableList.builder();
+            ImmutableList.Builder<Vector2f> texBuilder = ImmutableList.builder();
+
+            for (MD5Model.Vertex vertex : vertices) {
+                Vector3f vertexPos = new Vector3f();
+                Vector2f vertexTextCoords = vertex.getTexCoords();
+
+                int startWeight = vertex.getWeightStart();
+                int numWeights = vertex.getNumweights();
+
+                for (int i = startWeight; i < startWeight + numWeights; i++) {
+                    MD5Model.Weight weight = weights[i];
+                    MD5Model.Joint joint = joints.get(weight.getJointIndex());
+                    Vector3f weightPos = weight.getPos();
+                    Quat4f weightQuat = new Quat4f(weightPos.x, weightPos.y, weightPos.z, 0);
+                    weightQuat.mul(joint.getRot());
+                    Vector3f rotatedPos = new Vector3f(weightQuat.x, weightQuat.y, weightQuat.z);
+                    Vector3f acumPos = new Vector3f(joint.getPos());
+                    acumPos.add(rotatedPos);
+                    acumPos.scale(weight.getBias());
+                    vertexPos.add(acumPos);
+                }
+
+                wrappedVertices.add(new WrappedVertex(vertexPos, vertexTextCoords));
+                posBuilder.add(vertexPos);
+                texBuilder.add(vertexTextCoords);
+            }
+
+            for (MD5Model.Triangle tri : mesh.getTriangles()) {
+                indices.add(tri.getV1());
+                indices.add(tri.getV2());
+                indices.add(tri.getV3());
+
+                // Normals
+                WrappedVertex v0 = wrappedVertices.get(tri.getV1());
+                WrappedVertex v1 = wrappedVertices.get(tri.getV2());
+                WrappedVertex v2 = wrappedVertices.get(tri.getV3());
+                Vector3f pos0 = v0.pos;
+                Vector3f pos1 = v1.pos;
+                Vector3f pos2 = v2.pos;
+
+                // calculate triangle face normal as normal cross n2
+                // add to vertex and normalize later
+                Vector3f normal = (new Vector3f(pos2));
+                normal.sub(pos0);
+                Vector3f n2 = (new Vector3f(pos1));
+                n2.sub(pos0);
+                normal.cross(normal, n2);
+
+                v0.norm.add(normal);
+                v1.norm.add(normal);
+                v2.norm.add(normal);
+            }
+
+            for(WrappedVertex wv : wrappedVertices) {
+                wv.norm.normalize();
+                normBuilder.add(wv.norm);
+            }
+
+            return new WrappedMesh(indices.build(), posBuilder.build(), normBuilder.build(), texBuilder.build());
         }
 
         private static String getLocation(String path)
@@ -242,18 +317,39 @@ public enum MD5Loader implements ICustomModelLoader {
     }
 
     private static final class WrappedMesh {
+        private final ImmutableList<Integer> indices;
+        private final ImmutableList<Vector3f> positions;
+        private final ImmutableList<Vector3f> normals;
+        private final ImmutableList<Vector2f> texCoords;
 
+        public WrappedMesh(ImmutableList<Integer> indices, ImmutableList<Vector3f> positions,
+                           ImmutableList<Vector3f> normals, ImmutableList<Vector2f> texCoords) {
+            this.indices = indices;
+            this.positions = positions;
+            this.normals = normals;
+            this.texCoords = texCoords;
+        }
     }
 
     private static final class WrappedVertex {
         private final Vector3f pos;
-        private final Vector3f norm;
+        private Vector3f norm;
         private final Vector2f texCoords;
+
+        public WrappedVertex(Vector3f pos, Vector2f texCoords) {
+            this.pos = pos;
+            this.texCoords = texCoords;
+        }
+
+        public void setNorm(Vector3f norm) {
+            this.norm = norm;
+        }
+
+        public Vector3f getNorm() { return this.norm; }
     }
 
     private static final class BakedWrapper implements IBakedModel {
-        private final ImmutableList<MD5Model.Mesh> meshes;
-        private final ImmutableList<MD5Model.Joint> joints;
+        private final ImmutableList<WrappedMesh> meshes;
         private final IModelState state;
         private final boolean smooth;
         private final boolean gui3d;
@@ -264,10 +360,9 @@ public enum MD5Loader implements ICustomModelLoader {
         // not sure when this is first created
         private ImmutableList<BakedQuad> quads;
 
-        public BakedWrapper(ImmutableList<MD5Model.Mesh> meshes, ImmutableList<MD5Model.Joint> joints, IModelState state,
+        public BakedWrapper(ImmutableList<WrappedMesh> meshes, ImmutableList<MD5Model.Joint> joints, IModelState state,
                             boolean smooth, boolean gui3d, VertexFormat format, ImmutableMap<String, TextureAtlasSprite> textures) {
             this.meshes = meshes;
-            this.joints = joints;
             this.state = state;
             this.smooth = smooth;
             this.gui3d = gui3d;
@@ -322,7 +417,7 @@ public enum MD5Loader implements ICustomModelLoader {
             return quads;
         }
 
-        private void generateQuads(ImmutableList.Builder<BakedQuad> builder, ImmutableList<MD5Model.Mesh> meshes, final IModelState state, ImmutableList<String> path)
+        private void generateQuads(ImmutableList.Builder<BakedQuad> builder, ImmutableList<WrappedMesh> meshes, final IModelState state, ImmutableList<String> path)
         {
             ImmutableList.Builder<String> pathBuilder = ImmutableList.builder();
             pathBuilder.addAll(path);
@@ -479,33 +574,6 @@ public enum MD5Loader implements ICustomModelLoader {
         public TRSRTransformation apply(float time) {
             return null;
         }
-    }
-
-    static final class MD5Joint implements IJoint {
-        private final MD5Model.Node node;
-
-        public MD5Joint(MD5Model.Node node) { this.node = node; }
-
-        @Override
-        public TRSRTransformation getInvBindPose()
-        {
-            Matrix4f m = new TRSRTransformation(node.getMatrix()).getMatrix();
-            m.invert();
-            TRSRTransformation pose = new TRSRTransformation(m);
-
-            if(node.getParent() != null)
-            {
-                TRSRTransformation parent = new MD5Joint(node.getParent()).getInvBindPose();
-                pose = pose.compose(parent);
-            }
-            return pose;
-        }
-
-        public Optional<? extends IJoint> getParent(){
-            if(node.getParent() == null) return Optional.empty();
-            else return Optional.of(new MD5Joint(node.getParent()));
-        }
-
     }
 }
 

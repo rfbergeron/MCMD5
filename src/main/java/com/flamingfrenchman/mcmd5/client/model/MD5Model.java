@@ -151,9 +151,9 @@ public class MD5Model {
                     }
                     else if(line.contains("tri")) {
                         String[] triData = line.trim().split(" ");
-                        Vertex v1 = verts[Integer.parseInt(triData[2])];
-                        Vertex v2 = verts[Integer.parseInt(triData[3])];
-                        Vertex v3 = verts[Integer.parseInt(triData[4])];
+                        int v1 = Integer.parseInt(triData[2]);
+                        int v2 = Integer.parseInt(triData[3]);
+                        int v3 = Integer.parseInt(triData[4]);
                         tris[tricount++] = new Triangle(v1, v2, v3);
                     }
                     else if(line.contains("vert")) {
@@ -233,6 +233,11 @@ public class MD5Model {
             this.pos = pos;
             this.rot = rot;
         }
+
+        public Quat4f getRot() { return rot; }
+        public Vector3f getPos() { return pos; }
+        public int getParent() { return parent; }
+        public String getName() { return name; }
     }
 
     public static class Mesh {
@@ -270,25 +275,18 @@ public class MD5Model {
     }
 
     public static class Triangle {
-        private final Vertex[] vertices;
+        private final int[] vertices;
 
-        public Triangle(Vertex v1, Vertex v2, Vertex v3) {
-            this.vertices = new Vertex[3];
+        public Triangle(int v1, int v2, int v3) {
+            this.vertices = new int[3];
             this.vertices[0] = v1;
             this.vertices[1] = v2;
             this.vertices[2] = v3;
         }
 
-        public Triangle(Vertex[] vertices) {
-            this.vertices = new Vertex[3];
-            this.vertices[0] = vertices[0];
-            this.vertices[1] = vertices[1];
-            this.vertices[2] = vertices[2];
-        }
-
-        public Vertex getV1() { return vertices[0]; }
-        public Vertex getV2() { return vertices[1]; }
-        public Vertex getV3() { return vertices[2]; }
+        public int getV1() { return vertices[0]; }
+        public int getV2() { return vertices[1]; }
+        public int getV3() { return vertices[2]; }
     }
 
     public static class Vertex {
@@ -297,8 +295,8 @@ public class MD5Model {
         private final int numWeights;
 
         public Vector2f getTexCoords() { return this.texCoords; }
-        private int getWeightStart() { return this.weightStart; }
-        private int getNumweights() { return this.numWeights; }
+        public int getWeightStart() { return this.weightStart; }
+        public int getNumweights() { return this.numWeights; }
 
         public Vertex(Vector2f texCoords, int weightStart, int numWeights) {
             this.texCoords = texCoords;
