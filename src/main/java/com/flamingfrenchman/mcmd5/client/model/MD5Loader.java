@@ -22,6 +22,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.MathHelper;
 import net.minecraftforge.client.model.*;
+import net.minecraftforge.client.model.b3d.B3DModel;
 import net.minecraftforge.client.model.pipeline.UnpackedBakedQuad;
 import net.minecraftforge.common.model.IModelPart;
 import net.minecraftforge.common.model.IModelState;
@@ -125,12 +126,22 @@ public enum MD5Loader implements ICustomModelLoader {
         return new ModelWrapper(modelLocation, model, true, true, 0);
     }
 
-    private static final class MD5State implements  IModelState {
+    /*
+     * Represents the dynamic information associated with the model.
+     * Common use case is (possibly interpolated) animation frame.
+     */
+    private static final class MD5State implements IModelState {
+        private MD5State parent;
+        @Nullable
+        private final int frame;
+        private final int nextFrame;
+        private final float progress;
         /*
          * Returns the transformation that needs to be applied to the specific part of the model.
          * Coordinate system is determined by the part type.
          * if no part is provided, global model transformation is returned.
          */
+
         public Optional<TRSRTransformation> apply(Optional<? extends IModelPart> part) {
             return null;
         }
@@ -364,7 +375,7 @@ public enum MD5Loader implements ICustomModelLoader {
         public Vector3f getNorm() { return this.norm; }
     }
 
-    private static final class BakedWrapper implements IBakedModel {
+    private static final class  BakedWrapper implements IBakedModel {
         private final ImmutableList<WrappedMesh> meshes;
         private final IModelState state;
         private final boolean smooth;
@@ -563,9 +574,13 @@ public enum MD5Loader implements ICustomModelLoader {
 
     // use for nodes defined in library_nodes; not sure if animation is hierarchical or
     // also local transforms
-    static final class MD5JointClip implements IJointClip {
-        public TRSRTransformation apply(float time) {
-            return null;
+    static final class MD5Joint implements IJoint {
+        public TRSRTransformation getInvBindPose() {
+            return new TRSRTransformation(new Matrix4f());
+        }
+
+        public Optional<? extends IJoint> getParent() {
+            return Optional.empty();
         }
     }
 }

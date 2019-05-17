@@ -16,8 +16,8 @@ public class Mcmd5
     public static final String VERSION = "0.1";
     public static boolean debug = true;
 
-    @SidedProxy(serverSide = "com.flamingfrenchman.mcollada.proxy.CommonProxy",
-            clientSide = "com.flamingfrenchman.mcollada.proxy.ClientProxy")
+    @SidedProxy(serverSide = "com.flamingfrenchman.mcmd5.proxy.CommonProxy",
+            clientSide = "com.flamingfrenchman.mcmd5.proxy.ClientProxy")
     public static CommonProxy proxy;
 
     public static Logger logger;

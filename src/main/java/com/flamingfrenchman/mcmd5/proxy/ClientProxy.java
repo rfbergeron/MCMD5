@@ -11,7 +11,7 @@ import org.apache.logging.log4j.Level;
 public class ClientProxy extends CommonProxy {
 
     public void preInit(FMLPreInitializationEvent event) {
-        MD5Loader.INSTANCE.INSTANCE.addDomain("mcollada");
+        MD5Loader.INSTANCE.INSTANCE.addDomain(Mcmd5.MODID);
         ModelLoaderRegistry.registerLoader(MD5Loader.INSTANCE);
     }
 
