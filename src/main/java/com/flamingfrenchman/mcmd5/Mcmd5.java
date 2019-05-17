@@ -11,8 +11,8 @@ import org.apache.logging.log4j.Logger;
 @Mod(modid = Mcmd5.MODID, name = Mcmd5.NAME, version = Mcmd5.VERSION)
 public class Mcmd5
 {
-    public static final String MODID = "mcollada";
-    public static final String NAME = "MCOLLADA";
+    public static final String MODID = "mcmd5";
+    public static final String NAME = "MCMD5";
     public static final String VERSION = "0.1";
     public static boolean debug = true;
 

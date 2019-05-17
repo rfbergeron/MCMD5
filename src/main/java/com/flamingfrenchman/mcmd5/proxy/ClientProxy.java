@@ -1,7 +1,7 @@
 package com.flamingfrenchman.mcmd5.proxy;
 
 import com.flamingfrenchman.mcmd5.Mcmd5;
-import com.flamingfrenchman.mcmd5.client.model.DAELoader;
+import com.flamingfrenchman.mcmd5.client.model.MD5Loader;
 import net.minecraftforge.client.model.ModelLoaderRegistry;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
@@ -11,8 +11,8 @@ import org.apache.logging.log4j.Level;
 public class ClientProxy extends CommonProxy {
 
     public void preInit(FMLPreInitializationEvent event) {
-        DAELoader.INSTANCE.addDomain("mcollada");
-        ModelLoaderRegistry.registerLoader(DAELoader.INSTANCE);
+        MD5Loader.INSTANCE.INSTANCE.addDomain("mcollada");
+        ModelLoaderRegistry.registerLoader(MD5Loader.INSTANCE);
     }
 
     public void init(FMLInitializationEvent event)

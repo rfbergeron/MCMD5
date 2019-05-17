@@ -3,29 +3,13 @@ package com.flamingfrenchman.mcmd5.client.model;
 import com.flamingfrenchman.mcmd5.Mcmd5;
 import com.google.common.collect.*;
 
-import javax.annotation.Nullable;
 import javax.vecmath.*;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.rmi.server.ExportException;
-import java.util.*;
-import java.util.function.Function;
-
-import com.sun.istack.internal.NotNull;
 import net.minecraft.client.resources.IResourceManager;
 
 import net.minecraft.util.ResourceLocation;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.logging.log4j.Level;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
-import scala.xml.Elem;
 
 public class MD5Model {
     // at some point, utilize IJoint and IModelState for animating
@@ -260,7 +244,7 @@ public class MD5Model {
         public Vertex[] getVertices() { return this.vertices; }
         public Weight[] getWeights() {return this.weights; }
 
-        public ImmutableList<Triangle> bake(Function<Node, Matrix4f> animator)
+        /*public ImmutableList<Triangle> bake(Function<Node, Matrix4f> animator)
         {
             ImmutableList.Builder<Triangle> builder = ImmutableList.builder();
             for(Triangle t : triangles)
@@ -271,7 +255,7 @@ public class MD5Model {
                 builder.add(new Triangle(v1, v2, v3, t.material));
             }
             return builder.build();
-        }
+        }*/
     }
 
     public static class Triangle {
@@ -304,7 +288,7 @@ public class MD5Model {
             this.numWeights = numWeights;
         }
 
-        public Vertex bake(Mesh mesh, Function<Node, Matrix4f> animator)
+        /*public Vertex bake(Mesh mesh, Function<Node, Matrix4f> animator)
         {
             // geometry
             Float totalWeight = 0f;
@@ -336,7 +320,7 @@ public class MD5Model {
 
             // texCoords TODO
             return new Vertex(rPos, rNormal, color, texCoords);
-        }
+        }*/
     }
 
     public static class Weight {

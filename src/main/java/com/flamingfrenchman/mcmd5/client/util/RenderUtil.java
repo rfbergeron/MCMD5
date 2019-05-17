@@ -1,4 +1,4 @@
-package com.flamingfrenchman.mcollada.client.util;
+package com.flamingfrenchman.mcmd5.client.util;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.*;

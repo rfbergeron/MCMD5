@@ -245,7 +245,7 @@ public enum MD5Loader implements ICustomModelLoader {
                 normBuilder.add(wv.norm);
             }
 
-            return new WrappedMesh(indices.build(), posBuilder.build(), normBuilder.build(), texBuilder.build());
+            return new WrappedMesh(indices.build(), posBuilder.build(), normBuilder.build(), texBuilder.build(), mesh.getTexture());
         }
 
         private static String getLocation(String path)
@@ -284,7 +284,7 @@ public enum MD5Loader implements ICustomModelLoader {
                 }
             }
             builder.put("missingno", missing);
-            return new BakedWrapper(model.getMeshes(), model.getJoints(), state, smooth, gui3d, format, builder.build());
+            return new BakedWrapper(meshes, model.getJoints(), state, smooth, gui3d, format, builder.build());
         }
 
         public IModelState getDefaultState() {
@@ -317,17 +317,33 @@ public enum MD5Loader implements ICustomModelLoader {
     }
 
     private static final class WrappedMesh {
+        private final String texture;
         private final ImmutableList<Integer> indices;
         private final ImmutableList<Vector3f> positions;
         private final ImmutableList<Vector3f> normals;
         private final ImmutableList<Vector2f> texCoords;
 
         public WrappedMesh(ImmutableList<Integer> indices, ImmutableList<Vector3f> positions,
-                           ImmutableList<Vector3f> normals, ImmutableList<Vector2f> texCoords) {
+                           ImmutableList<Vector3f> normals, ImmutableList<Vector2f> texCoords,
+                           String texture) {
             this.indices = indices;
             this.positions = positions;
             this.normals = normals;
             this.texCoords = texCoords;
+            this.texture = texture;
+        }
+
+        public Vector3f getFaceNormal(int index) {
+            Vector3f v1 = positions.get(index);
+            Vector3f v2 = positions.get(index + 1);
+            Vector3f v3 = positions.get(index + 2);
+
+            Vector3f normal = new Vector3f(v3.x, v3.y, v3.z);
+            Vector3f n1 = new Vector3f(v2.x, v2.y, v2.z);
+            normal.sub(v1);
+            n1.sub(v1);
+            normal.cross(normal, n1);
+            return normal;
         }
     }
 
@@ -419,18 +435,8 @@ public enum MD5Loader implements ICustomModelLoader {
 
         private void generateQuads(ImmutableList.Builder<BakedQuad> builder, ImmutableList<WrappedMesh> meshes, final IModelState state, ImmutableList<String> path)
         {
-            ImmutableList.Builder<String> pathBuilder = ImmutableList.builder();
-            pathBuilder.addAll(path);
-            pathBuilder.add(node.getId());
-            ImmutableList<String> newPath = pathBuilder.build();
-            for(MD5Model.Node child : node.getChildren()) {
-                generateQuads(builder, child, state, newPath);
-            }
-
-            for(MD5Model.InstanceGeometry geometry : node.getGeometry()) {
-                if(!state.apply(Optional.of(Models.getHiddenModelPart(newPath))).isPresent()) {
-                    MD5Model.Mesh mesh = geometry.getInstance().mesh;
-                    Collection<MD5Model.Triangle> triangles = mesh.bake(new Function<MD5Model.Node, Matrix4f>()
+            for(WrappedMesh mesh : meshes) {
+                    /*Collection<MD5Model.Triangle> triangles = mesh.bake(new Function<MD5Model.Node, Matrix4f>()
                     {
                         private final TRSRTransformation global = state.apply(Optional.empty()).orElse(TRSRTransformation.identity());
                         private final LoadingCache<MD5Model.Node, TRSRTransformation> localCache = CacheBuilder.newBuilder()
@@ -449,32 +455,35 @@ public enum MD5Loader implements ICustomModelLoader {
                         {
                             return global.compose(localCache.getUnchecked(node)).getMatrix();
                         }
-                    });
-                    for(MD5Model.Triangle t : triangles)
-                    {
+                    });*/
+
+                    for(int i = 0 ; i < mesh.indices.size() - 2; i += 3) {
                         UnpackedBakedQuad.Builder quadBuilder = new UnpackedBakedQuad.Builder(format);
                         quadBuilder.setContractUVs(true);
-                        quadBuilder.setQuadOrientation(EnumFacing.getFacingFromVector(t.getNormal().x, t.getNormal().y, t.getNormal().z));
-                        List<MD5Model.Image> textures = null;
+                        Vector3f faceNormal = mesh.getFaceNormal(i);
+                        quadBuilder.setQuadOrientation(EnumFacing.getFacingFromVector(faceNormal.x, faceNormal.y, faceNormal.z));
+                        // rename this shit because they don't correspond to axes but instead to
+                        // the vertices of a triangle
+
+                        int xind = mesh.indices.get(i);
+                        int yind = mesh.indices.get(i + 1);
+                        int zind = mesh.indices.get(i +2);
+                        TextureAtlasSprite sprite = this.textures.get(mesh.texture);
+                        quadBuilder.setTexture(sprite);
+
+                        putVertexData(quadBuilder, mesh.positions.get(xind), mesh.normals.get(xind), mesh.texCoords.get(xind), sprite);
+                        putVertexData(quadBuilder, mesh.positions.get(yind), mesh.normals.get(yind), mesh.texCoords.get(yind), sprite);
+                        putVertexData(quadBuilder, mesh.positions.get(zind), mesh.normals.get(zind), mesh.texCoords.get(zind), sprite);
                         // the following code assumes one textures per instance_geometry entry.
                         // need to study spec further to determine if this is always the case.
-                        if(geometry.getMaterial() != null) textures = geometry.getMaterial().effect.getImages();
-                        TextureAtlasSprite sprite;
-                        if(textures == null || textures.isEmpty()) sprite = ModelLoader.White.INSTANCE;
-                        else if(textures.get(0) == MD5Model.Image.White) sprite = ModelLoader.White.INSTANCE;
-                        else sprite = this.textures.get(textures.get(0).getPath());
-                        quadBuilder.setTexture(sprite);
-                        putVertexData(quadBuilder, t.getV1(), t.getV1().normal, sprite);
-                        putVertexData(quadBuilder, t.getV2(), t.getV2().normal, sprite);
-                        putVertexData(quadBuilder, t.getV3(), t.getV3().normal, sprite);
-                        putVertexData(quadBuilder, t.getV3(), t.getV3().normal, sprite);
-                        builder.add(quadBuilder.build());
+                        //
+                        //texture must be a ResourceLocation
+
                     }
-                }
             }
         }
 
-        private final void putVertexData(UnpackedBakedQuad.Builder builder, MD5Model.Vertex v, Vector3f faceNormal, TextureAtlasSprite sprite)
+        private final void putVertexData(UnpackedBakedQuad.Builder builder, Vector3f pos, Vector3f faceNormal, Vector2f texCoords, TextureAtlasSprite sprite)
         {
             // TODO handle everything not handled (texture transformations, bones, transformations, normals, e.t.c)
 
@@ -483,9 +492,9 @@ public enum MD5Loader implements ICustomModelLoader {
                 switch(format.getElement(e).getUsage())
                 {
                     case POSITION:
-                        builder.put(e, v.getPos().x, v.getPos().y, v.getPos().z, 1);
+                        builder.put(e, pos.x, pos.y, pos.z, 1);
                         break;
-                    case COLOR:
+                    /*case COLOR:
                         if(v.getColor() != null)
                         {
                             builder.put(e, v.getColor().x, v.getColor().y, v.getColor().z, v.getColor().w);
@@ -494,34 +503,18 @@ public enum MD5Loader implements ICustomModelLoader {
                         {
                             builder.put(e, 1, 1, 1, 1);
                         }
-                        break;
+                        break;*/
                     case UV:
                         // TODO handle more brushes
-                        if(format.getElement(e).getIndex() < v.getTexCoords().length)
-                        {
-                            if(sprite == null) Mcmd5.logger.log(Level.INFO, "sprite is null");
-
                             builder.put(e,
-                                    sprite.getInterpolatedU(v.getTexCoords()[format.getElement(e).getIndex()].x * 16),
-                                    sprite.getInterpolatedV(v.getTexCoords()[format.getElement(e).getIndex()].y * 16),
+                                    sprite.getInterpolatedU(texCoords.x * 16),
+                                    sprite.getInterpolatedV(texCoords.y * 16),
                                     0,
                                     1
                             );
-                        }
-                        else
-                        {
-                            builder.put(e, 0, 0, 0, 1);
-                        }
                         break;
                     case NORMAL:
-                        if(v.getNormal() != null)
-                        {
-                            builder.put(e, v.getNormal().x, v.getNormal().y, v.getNormal().z, 0);
-                        }
-                        else
-                        {
-                            builder.put(e, faceNormal.x, faceNormal.y, faceNormal.z, 0);
-                        }
+                        builder.put(e, faceNormal.x, faceNormal.y, faceNormal.z, 0);
                         break;
                     default:
                         builder.put(e);
