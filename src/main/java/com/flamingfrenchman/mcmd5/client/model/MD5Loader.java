@@ -8,6 +8,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableTable;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -147,6 +148,90 @@ public enum MD5Loader implements ICustomModelLoader {
         }
         
         public MD5State getParent() { return null; }
+    }
+
+    private static final class Animation
+    {
+        private final int flags;
+        private final int frames;
+        private final float fps;
+        // first int is frame, second int is mesh index
+        private final ImmutableTable<Integer, WrappedMesh, Key> keys;
+
+        public Animation(int flags, int frames, float fps, ImmutableTable<Integer, WrappedMesh, Key> keys)
+        {
+            this.flags = flags;
+            this.frames = frames;
+            this.fps = fps;
+            this.keys = keys;
+        }
+
+        public int getFlags()
+        {
+            return flags;
+        }
+
+        public int getFrames()
+        {
+            return frames;
+        }
+
+        public float getFps()
+        {
+            return fps;
+        }
+
+        public ImmutableTable<Integer, WrappedMesh, Key> getKeys()
+        {
+            return keys;
+        }
+
+        @Override
+        public String toString()
+        {
+            return String.format("Animation [flags=%s, frames=%s, fps=%s, keys=...]", flags, frames, fps);
+        }
+    }
+
+    private static final class Key
+    {
+        @Nullable
+        private final Vector3f pos;
+        @Nullable
+        private final Vector3f scale;
+        @Nullable
+        private final Quat4f rot;
+
+        public Key(@Nullable Vector3f pos, @Nullable Vector3f scale, @Nullable Quat4f rot)
+        {
+            this.pos = pos;
+            this.scale = scale;
+            this.rot = rot;
+        }
+
+        @Nullable
+        public Vector3f getPos()
+        {
+            return pos;
+        }
+
+        @Nullable
+        public Vector3f getScale()
+        {
+            return scale;
+        }
+
+        @Nullable
+        public Quat4f getRot()
+        {
+            return rot;
+        }
+
+        @Override
+        public String toString()
+        {
+            return String.format("Key [pos=%s, scale=%s, rot=%s]", pos, scale, rot);
+        }
     }
 
     private static final class ModelWrapper implements IModel {
