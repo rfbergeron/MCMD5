@@ -16,41 +16,24 @@ public class MD5Model {
     // use Quat4f for interpolation. Look at other vector classes/
     // utilities to see if they have other useful functions
 
-    private final ImmutableList<Mesh> meshes;
-    private final ImmutableList<Joint> joints;
+    private final ImmutableList<MD5Mesh> meshes;
+    private final ImmutableList<MD5Joint> joints;
 
     public static boolean debugGeometry = false;
     public static boolean debugTextures = true;
     public static boolean debugNodes = true;
 
-    public MD5Model(ImmutableList<Mesh> meshes, ImmutableList<Joint> joints) {
+    public MD5Model(ImmutableList<MD5Mesh> meshes, ImmutableList<MD5Joint> joints) {
         this.meshes = meshes;
         this.joints = joints;
     }
 
-    public ImmutableList<Mesh> getMeshes() { return this.meshes; }
-    public ImmutableList<Joint> getJoints() { return this.joints; }
+    public ImmutableList<MD5Mesh> getMeshes() { return this.meshes; }
+    public ImmutableList<MD5Joint> getJoints() { return this.joints; }
     
     public static void log(String str) {
         Mcmd5.logger.log(Level.INFO, str);
     }
-
-    /*public ImmutableList<MD5Model.Triangle> bake(Function<MD5Model, Matrix4f> animator)
-    {
-        ImmutableList.Builder<MD5Model.Triangle> builder = ImmutableList.builder();
-
-        for(MD5Model.Geometry geometry : geometries) {
-            for(MD5Model.Triangle t : geometry.triangles.tris)
-            {
-                MD5Model.Vertex v1 = t.vertices[0].bake(this, animator);
-                MD5Model.Vertex v2 = t.vertices[1].bake(this, animator);
-                MD5Model.Vertex v3 = t.vertices[2].bake(this, animator);
-                builder.add(new MD5Model.Triangle(v1, v2, v3));
-            }
-        }
-
-        return builder.build();
-    }*/
 
     public static class Parser extends DefaultHandler {
         private IResourceManager manager;
@@ -71,8 +54,8 @@ public class MD5Model {
         public MD5Model parse() throws IOException {
             //Joint[] joints = null;
             //Mesh[] meshes = null;
-            ImmutableList.Builder<Mesh> meshBuilder = ImmutableList.builder();
-            ImmutableList.Builder<Joint> jointBuilder = ImmutableList.builder();
+            ImmutableList.Builder<MD5Mesh> meshBuilder = ImmutableList.builder();
+            ImmutableList.Builder<MD5Joint> jointBuilder = ImmutableList.builder();
             int numjoints = 0;
             int meshCount = 0;
 
@@ -107,11 +90,11 @@ public class MD5Model {
             }*/
         }
 
-        private Mesh parseMesh() {
+        private MD5Mesh parseMesh() {
             String shader = "";
-            Vertex[] verts = null;
-            Triangle[] tris = null;
-            Weight[] weights = null;
+            MD5Vertex[] verts = null;
+            MD5Triangle[] tris = null;
+            MD5Weight[] weights = null;
             int vertcount = 0;
             int tricount = 0;
             int weightcount = 0;
@@ -123,22 +106,22 @@ public class MD5Model {
                     }
                     else if(line.contains("numverts")) {
                         int numverts = Integer.parseInt(line.trim().split(" ")[1]);
-                        verts = new Vertex[numverts];
+                        verts = new MD5Vertex[numverts];
                     }
                     else if(line.contains("numtris")) {
                         int numtris = Integer.parseInt(line.trim().split(" ")[1]);
-                        tris = new Triangle[numtris];
+                        tris = new MD5Triangle[numtris];
                     }
                     else if(line.contains("numweights")) {
                         int numweights = Integer.parseInt(line.trim().split(" ")[1]);
-                        weights = new Weight[numweights];
+                        weights = new MD5Weight[numweights];
                     }
                     else if(line.contains("tri")) {
                         String[] triData = line.trim().split(" ");
                         int v1 = Integer.parseInt(triData[2]);
                         int v2 = Integer.parseInt(triData[3]);
                         int v3 = Integer.parseInt(triData[4]);
-                        tris[tricount++] = new Triangle(v1, v2, v3);
+                        tris[tricount++] = new MD5Triangle(v1, v2, v3);
                     }
                     else if(line.contains("vert")) {
                         String[] vertData = line.trim().split(" ");
@@ -146,7 +129,7 @@ public class MD5Model {
                         float v = Float.parseFloat(vertData[4]);
                         int weightstart = Integer.parseInt(vertData[6]);
                         int numweights = Integer.parseInt(vertData[7]);
-                        verts[vertcount++] = new Vertex(new Vector2f(u, v), weightstart, numweights);
+                        verts[vertcount++] = new MD5Vertex(new Vector2f(u, v), weightstart, numweights);
                     }
                     else if(line.contains("weight")) {
                         String[] weightData = line.trim().split(" ");
@@ -155,7 +138,7 @@ public class MD5Model {
                         float x = Float.parseFloat(weightData[5]);
                         float y = Float.parseFloat(weightData[6]);
                         float z = Float.parseFloat(weightData[7]);
-                        weights[weightcount++] = new Weight(jointIndex, bias, new Vector3f(x, y, z));
+                        weights[weightcount++] = new MD5Weight(jointIndex, bias, new Vector3f(x, y, z));
                     }
                 }
             }
@@ -163,11 +146,11 @@ public class MD5Model {
 
             }
 
-            return new Mesh(shader, tris, verts, weights);
+            return new MD5Mesh(shader, tris, verts, weights);
         }
 
-        private Joint[] parseJoints(int numJoints) {
-            Joint[] joints = new Joint[numJoints];
+        private MD5Joint[] parseJoints(int numJoints) {
+            MD5Joint[] joints = new MD5Joint[numJoints];
             int jointCount = 0;
 
             try {
@@ -181,7 +164,7 @@ public class MD5Model {
                     float qy = Float.parseFloat(jointData[9]);
                     float qz = Float.parseFloat(jointData[10]);
                     //TODO: calculate quaternion w
-                    joints[jointCount] = new Joint(jointData[0], parent,
+                    joints[jointCount] = new MD5Joint(jointData[0], parent,
                             new Vector3f(x, y, z), calculateQuaternion(qx, qy, qz));
                 }
             }
@@ -205,13 +188,13 @@ public class MD5Model {
         }
     }
 
-    public static class Joint {
+    public static class MD5Joint {
         private final String name;
         private final int parent;
         private final Vector3f pos;
         private final Quat4f rot;
 
-        public Joint(String name, int parent, Vector3f pos, Quat4f rot) {
+        public MD5Joint(String name, int parent, Vector3f pos, Quat4f rot) {
             this.name = name;
             this.parent = parent;
             this.pos = pos;
@@ -224,15 +207,15 @@ public class MD5Model {
         public String getName() { return name; }
     }
 
-    public static class Mesh {
+    public static class MD5Mesh {
         private final String texture;
-        private final Triangle[] triangles;
-        private final Vertex[] vertices;
-        private final Weight[] weights;
+        private final MD5Triangle[] triangles;
+        private final MD5Vertex[] vertices;
+        private final MD5Weight[] weights;
 
         // TODO: implement getNormal(Triangle/index)
 
-        public Mesh(String texture, Triangle[] triangles, Vertex[] vertices, Weight[] weights) {
+        public MD5Mesh(String texture, MD5Triangle[] triangles, MD5Vertex[] vertices, MD5Weight[] weights) {
             this.texture = texture;
             this.triangles = triangles;
             this.vertices = vertices;
@@ -240,28 +223,15 @@ public class MD5Model {
         }
 
         public String getTexture() { return this.texture; }
-        public Triangle[] getTriangles() { return this.triangles; }
-        public Vertex[] getVertices() { return this.vertices; }
-        public Weight[] getWeights() {return this.weights; }
-
-        /*public ImmutableList<Triangle> bake(Function<Node, Matrix4f> animator)
-        {
-            ImmutableList.Builder<Triangle> builder = ImmutableList.builder();
-            for(Triangle t : triangles)
-            {
-                Vertex v1 = t.vertices[0].bake(this, animator);
-                Vertex v2 = t.vertices[1].bake(this, animator);
-                Vertex v3 = t.vertices[2].bake(this, animator);
-                builder.add(new Triangle(v1, v2, v3, t.material));
-            }
-            return builder.build();
-        }*/
+        public MD5Triangle[] getTriangles() { return this.triangles; }
+        public MD5Vertex[] getVertices() { return this.vertices; }
+        public MD5Weight[] getWeights() {return this.weights; }
     }
 
-    public static class Triangle {
+    public static class MD5Triangle {
         private final int[] vertices;
 
-        public Triangle(int v1, int v2, int v3) {
+        public MD5Triangle(int v1, int v2, int v3) {
             this.vertices = new int[3];
             this.vertices[0] = v1;
             this.vertices[1] = v2;
@@ -273,62 +243,37 @@ public class MD5Model {
         public int getV3() { return vertices[2]; }
     }
 
-    public static class Vertex {
+    public static class MD5Vertex {
         private final Vector2f texCoords;
         private final int weightStart;
         private final int numWeights;
+        private Vector3f pos = new Vector3f();
+        private Vector3f norm;
 
         public Vector2f getTexCoords() { return this.texCoords; }
         public int getWeightStart() { return this.weightStart; }
         public int getNumweights() { return this.numWeights; }
 
-        public Vertex(Vector2f texCoords, int weightStart, int numWeights) {
+        public MD5Vertex(Vector2f texCoords, int weightStart, int numWeights) {
             this.texCoords = texCoords;
             this.weightStart = weightStart;
             this.numWeights = numWeights;
         }
 
-        /*public Vertex bake(Mesh mesh, Function<Node, Matrix4f> animator)
-        {
-            // geometry
-            Float totalWeight = 0f;
-            Matrix4f t = new Matrix4f();
-            // TODO: handle animations
-            t.setIdentity();
-
-
-            // pos
-            Vector4f pos = new Vector4f(this.pos), newPos = new Vector4f();
-            pos.w = 1;
-            t.transform(pos, newPos);
-            Vector3f rPos = new Vector3f(newPos.x / newPos.w, newPos.y / newPos.w, newPos.z / newPos.w);
-
-            // normal
-            Vector3f rNormal = null;
-
-            if(this.normal != null)
-            {
-                Matrix3f tm = new Matrix3f();
-                t.getRotationScale(tm);
-                tm.invert();
-                tm.transpose();
-                Vector3f normal = new Vector3f(this.normal);
-                rNormal = new Vector3f();
-                tm.transform(normal, rNormal);
-                rNormal.normalize();
-            }
-
-            // texCoords TODO
-            return new Vertex(rPos, rNormal, color, texCoords);
-        }*/
+        public Vector3f getPos() { return pos; }
+        public void setPos(Vector3f pos) { this.pos = pos; }
+        public void addToPos(Vector3f in) { this.pos.add(in); }
+        public Vector3f getNorm() { return norm; }
+        public void setNorm() { this.norm = norm; }
+        public void addToNorm(Vector3f in) { this.norm.add(in); }
     }
 
-    public static class Weight {
+    public static class MD5Weight {
         private final int jointIndex;
         private final float bias;
         private final Vector3f pos;
 
-        public Weight(int jointIndex, float bias, Vector3f pos) {
+        public MD5Weight(int jointIndex, float bias, Vector3f pos) {
             this.jointIndex = jointIndex;
             this.bias = bias;
             this.pos = pos;
