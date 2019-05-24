@@ -210,7 +210,7 @@ public enum MD5Loader implements ICustomModelLoader {
                 }
                 return Optional.empty();
             }
-            if(!(part.get() instanceof MD5Joint))
+            if(!(part.get() instanceof WrappedJoint))
             {
                 return Optional.empty();
             }
@@ -230,7 +230,7 @@ public enum MD5Loader implements ICustomModelLoader {
                 nodeTransform = getNodeMatrix(part.get(), frame);
                 nodeTransform = nodeTransform.slerp(getNodeMatrix(part.get(), nextFrame), progress);
             }
-            if(parent != null && ((MD5Joint)part.get()).getParent() == null)
+            if(parent != null && ((WrappedJoint)part.get()).getParent() == null)
             {
                 return Optional.of(parent.apply(part).orElse(TRSRTransformation.identity()).compose(nodeTransform));
             }
@@ -266,7 +266,7 @@ public enum MD5Loader implements ICustomModelLoader {
             if(animation != null) key = animation.getKeys().get(frame, part);
             if(key != null)
             {
-                Optional parent = ((MD5Joint)part).getParent();
+                Optional parent = ((WrappedJoint)part).getParent();
 
                 if(parent.isPresent())
                 {
@@ -406,17 +406,17 @@ public enum MD5Loader implements ICustomModelLoader {
         private static ImmutableList<WrappedMesh> process(MD5Model model) {
             ImmutableList.Builder<WrappedMesh> builder = ImmutableList.builder();
             for(MD5Model.MD5Mesh mesh : model.getMeshes()) {
-                builder.add(generateWrappedMesh(model, mesh));
+                builder.add(generateWrappedMesh(model.getJoints(), mesh));
             }
             return builder.build();
         }
 
-        private static WrappedMesh generateWrappedMesh(MD5Model.MD5Joint[] joints, MD5Model.MD5Mesh mesh) {
+        private static WrappedMesh generateWrappedMesh(ImmutableList<MD5Model.MD5Joint> joints, MD5Model.MD5Mesh mesh) {
             MD5Model.MD5Vertex[] vertices = mesh.getVertices();
             MD5Model.MD5Weight[] weights = mesh.getWeights();
 
-            ImmutableList.Builder<WrappedJoint> jointBuilder = ImmutableList.builder();
             ImmutableList.Builder<WrappedTriangle> triangleBuilder = ImmutableList.builder();
+            ImmutableList.Builder<WrappedVertex> vertexBuilder = ImmutableList.builder();
 
             for (int j = 0 ; j < vertices.length ; ++j) {
                 MD5Model.MD5Vertex vertex = vertices[j];
@@ -428,7 +428,7 @@ public enum MD5Loader implements ICustomModelLoader {
 
                 for (int i = startWeight; i < startWeight + numWeights; i++) {
                     MD5Model.MD5Weight weight = weights[i];
-                    MD5Model.MD5Joint joint = joints[weight.getJointIndex()];
+                    MD5Model.MD5Joint joint = joints.get(weight.getJointIndex());
 
                     Vector3f weightPos = weight.getPos();
                     //extend pos to quat so it can be rotated
@@ -467,9 +467,12 @@ public enum MD5Loader implements ICustomModelLoader {
 
             for(MD5Model.MD5Vertex vertex : vertices) {
                 vertex.getNorm().normalize();
+                vertexBuilder.add(new WrappedVertex())
             }
 
-            
+            for(MD5Model.MD5Triangle tri : mesh.getTriangles()) {
+                triangleBuilder.add(new WrappedTriangle());
+            }
         }
 
         private static String getLocation(String path)
@@ -480,7 +483,7 @@ public enum MD5Loader implements ICustomModelLoader {
 
         public Collection<ResourceLocation> getTextures() {
             ImmutableList.Builder<ResourceLocation> locationBuilder = ImmutableList.builder();
-            for(MD5Model.Mesh mesh : model.getMeshes()) {
+            for(MD5Model.MD5Mesh mesh : model.getMeshes()) {
                 String key = mesh.getTexture();
                 locationBuilder.add(new ResourceLocation(modelLocation.getResourceDomain(), key));
             }
@@ -542,32 +545,20 @@ public enum MD5Loader implements ICustomModelLoader {
 
     private static final class WrappedMesh {
         private final String texture;
-        private final ImmutableList<Integer> indices;
-        private final ImmutableList<Vector3f> positions;
-        private final ImmutableList<Vector3f> normals;
-        private final ImmutableList<Vector2f> texCoords;
-        private ImmutableList<MD5Joint> joints;
+        private final ImmutableList<WrappedVertex> vertices;
+        private final ImmutableList<Integer> triangles;
 
-        private final ImmutableList<Float> biases;
-        private final ImmutableList<Integer> jointIndices;
-
-        public WrappedMesh(ImmutableList<Integer> indices, ImmutableList<Vector3f> positions,
-                           ImmutableList<Vector3f> normals, ImmutableList<Vector2f> texCoords,
-                           ImmutableList<Float> biases, ImmutableList<Integer> jointIndices,
-                           String texture) {
-            this.indices = indices;
-            this.positions = positions;
-            this.normals = normals;
-            this.texCoords = texCoords;
-            this.biases = biases;
-            this.jointIndices = jointIndices;
+        public WrappedMesh(String texture, ImmutableList<WrappedVertex> vertices,
+                           ImmutableList<Integer> triangles) {
             this.texture = texture;
+            this.vertices = vertices;
+            this.triangles = triangles;
         }
 
         public Vector3f getFaceNormal(int index) {
-            Vector3f v1 = positions.get(index);
-            Vector3f v2 = positions.get(index + 1);
-            Vector3f v3 = positions.get(index + 2);
+            Vector3f v1 = vertices.get(index).pos;
+            Vector3f v2 = vertices.get(index + 1).pos;
+            Vector3f v3 = vertices.get(index + 2).pos;
 
             Vector3f normal = new Vector3f(v3.x, v3.y, v3.z);
             Vector3f n1 = new Vector3f(v2.x, v2.y, v2.z);
@@ -577,56 +568,36 @@ public enum MD5Loader implements ICustomModelLoader {
             return normal;
         }
 
-        public WrappedMesh bake(Function<MD5Joint, Matrix4f> animator)
+        public WrappedMesh bake(Function<WrappedJoint, Matrix4f> animator)
         {
-            ImmutableList.Builder<Vector3f> posBuilder = ImmutableList.builder();
-            for(int i = 0 ; i < indices.size() ; ++i)
+            ImmutableList.Builder<WrappedVertex> builder = ImmutableList.builder();
+            for(WrappedVertex v : vertices)
             {
-                int i1 = i + 1;
-                int i2 = i1 + 1;
-
-                Vector3f v1 = this.positions.get(indices.get(i));
-                Vector3f v2 = this.positions.get(indices.get(i1));
-                Vector3f v3 = this.positions.get(indices.get(i2));
-                Vector3f n1 = this.normals.get(i);
-                Vector3f n2 = this.normals.get(i1);
-                Vector3f n3 = this.normals.get(i2);
-
-
-
-                builder.add(new B3DModel.Face(v1, v2, v3, f.getBrush()));
+                builder.add(v.bake(animator));
             }
-            return builder.build();
+            return new WrappedMesh(this.texture, builder.build(), this.triangles);
         }
-
-        public static Vector3f bakeVertex(Vector3f v, Function<B3DModel.Node<?>, Matrix4f> animator) {
-            Vector4f newVec = new Vector4f();
-            Vector4f newNorm = new Vector4f();
-
-            animator.
-        }
-    }
-
-    private static final class WrappedTriangle {
-        private final ImmutableList<WrappedVertex> vertices;
-
     }
 
     private static final class WrappedVertex {
         private final Vector3f pos;
-        private Vector3f norm;
+        private final Vector3f norm;
         private final Vector2f texCoords;
+        private final ImmutableList<WrappedJoint> joints;
+        private final ImmutableList<Integer> biases;
 
-        public WrappedVertex(Vector3f pos, Vector2f texCoords) {
+        public WrappedVertex(Vector3f pos, Vector3f norm, Vector2f texCoords,
+                             ImmutableList<WrappedJoint> joints, ImmutableList<Integer> biases) {
             this.pos = pos;
-            this.texCoords = texCoords;
-        }
-
-        public void setNorm(Vector3f norm) {
             this.norm = norm;
+            this.texCoords = texCoords;
+            this.joints = joints;
+            this.biases = biases;
         }
 
-        public Vector3f getNorm() { return this.norm; }
+        public WrappedVertex bake(Function<WrappedJoint, Matrix4f> animator) {
+
+        }
     }
 
     private static final class  BakedWrapper implements IBakedModel {
@@ -641,7 +612,7 @@ public enum MD5Loader implements ICustomModelLoader {
         // not sure when this is first created
         private ImmutableList<BakedQuad> quads;
 
-        public BakedWrapper(ImmutableList<WrappedMesh> meshes, ImmutableList<MD5Model.Joint> joints, IModelState state,
+        public BakedWrapper(ImmutableList<WrappedMesh> meshes, ImmutableList<MD5Model.MD5Joint> joints, IModelState state,
                             boolean smooth, boolean gui3d, VertexFormat format, ImmutableMap<String, TextureAtlasSprite> textures) {
             this.meshes = meshes;
             this.state = state;
@@ -829,7 +800,6 @@ public enum MD5Loader implements ICustomModelLoader {
     // use for nodes defined in library_nodes; not sure if animation is hierarchical or
     // also local transforms
     static final class WrappedJoint implements IJoint {
-        private List<WrappedMesh> boundMeshes;
         private IJoint parent;
         private TRSRTransformation invBindPose;
 
@@ -853,8 +823,6 @@ public enum MD5Loader implements ICustomModelLoader {
         public Optional<? extends IJoint> getParent() {
             return parent == null ? Optional.empty() : Optional.of(parent);
         }
-
-        public List<WrappedMesh> getBoundMeshes() { return boundMeshes; }
     }
 }
 
