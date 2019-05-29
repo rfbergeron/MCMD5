@@ -5,10 +5,15 @@ import com.google.common.collect.*;
 
 import javax.vecmath.*;
 import java.io.*;
+import java.util.regex.Pattern;
+
+import jdk.internal.util.xml.impl.Input;
+import net.minecraft.client.resources.IResource;
 import net.minecraft.client.resources.IResourceManager;
 
 import net.minecraft.util.ResourceLocation;
 import org.apache.logging.log4j.Level;
+import org.apache.commons.io.FileUtils;
 import org.xml.sax.helpers.DefaultHandler;
 
 public class MD5Model {
@@ -37,17 +42,29 @@ public class MD5Model {
 
     public static class Parser extends DefaultHandler {
         private IResourceManager manager;
-        private ResourceLocation location;
         private InputStream inputStream;
+        private InputStream animInputStream;
+        private Pattern regex = Pattern.compile("\\s");
         BufferedReader bufferedReader;
 
-        public Parser(InputStream in, IResourceManager manager, ResourceLocation location) throws IOException
+        public Parser(IResource resource, IResourceManager manager, ResourceLocation file) throws IOException
         {
             if(Mcmd5.debug)
                 Mcmd5.logger.log(Level.INFO, "New parser instance created");
-            this.inputStream = in;
+            this.inputStream = resource.getInputStream();
             this.manager = manager;
-            this.location = location;
+
+            ResourceLocation animLocation = new ResourceLocation(file.getResourceDomain(),
+                    file.getResourceDomain().substring(0, ".md5mesh".length()) + ".md5anim");
+            IResource animResourse = null;
+
+            try {
+                animResourse = manager.getResource(animLocation);
+                animInputStream = animResourse.getInputStream();
+            }
+            catch (Exception e) {
+                Mcmd5.logger.log(Level.INFO, "Could not find anim file for " + file.toString() + ", assuming none associated.");
+            }
         }
 
 
@@ -56,8 +73,11 @@ public class MD5Model {
             //Mesh[] meshes = null;
             ImmutableList.Builder<MD5Mesh> meshBuilder = ImmutableList.builder();
             ImmutableList.Builder<MD5Joint> jointBuilder = ImmutableList.builder();
-            int numjoints = 0;
+            int numJoints = 0;
             int meshCount = 0;
+            int numFrames = 0;
+            int frameRate = 0;
+            int numAnimatedComponents = 0;
 
             if(Mcmd5.debug)
                 Mcmd5.logger.log(Level.INFO, "Parsing");
@@ -65,29 +85,53 @@ public class MD5Model {
                 bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
                 for(String line ; (line = bufferedReader.readLine()) != null; ) {
                     if(line.contains("numJoints")) {
-                        //int len = Integer.parseInt(line.substring("numjoints".length()));
-                        //joints = new Joint[len];
+                        numJoints = Integer.parseInt(line.substring("numJoints".length()).trim());
                     }
                     else if(line.contains("numMeshes")) {
-                        //int len = Integer.parseInt(line.substring("numMeshes".length()));
-                       // meshes = new Mesh[len];
+                        meshCount = Integer.parseInt(line.substring("numMeshes".length()).trim());
                     }
                     if(line.contains("mesh")) {
                         meshBuilder.add(parseMesh());
                     }
                     else if(line.contains("joints")) {
-                        jointBuilder.add(parseJoints(numjoints));
+                        jointBuilder.add(parseJoints(numJoints));
                     }
                 }
-                return new MD5Model(meshBuilder.build(), jointBuilder.build());
+
+                bufferedReader.close();
+                bufferedReader = new BufferedReader(new InputStreamReader(animInputStream));
+                for(String line ; (line = bufferedReader.readLine()) != null; ) {
+                    if(line.contains("numFrames")) {
+                        numFrames = Integer.parseInt(line.substring("numFrames".length()).trim());
+                    }
+                    else if(line.contains("numJoints")) {
+                        numJoints = Integer.parseInt(line.substring("numJoints".length()).trim());
+                    }
+                    else if(line.contains("frameRate")) {
+                        frameRate = Integer.parseInt(line.substring("frameRate".length()).trim());
+                    }
+                    else if(line.contains("numAnimatedComponents")) {
+                        numAnimatedComponents = Integer.parseInt(line.substring("numAnimatedComponents".length()).trim());
+                    }
+                    else if(line.contains("hierarchy")) {
+
+                    }
+                    else if(line.contains("bounds")) {
+
+                    }
+                    else if(line.contains("baseframe")) {
+
+                    }
+                    else if(line.contains("frame")) {
+
+                    }
+                }
             }
-            catch(Exception e) {
-                throw e;
+            finally {
+                bufferedReader.close();
             }
-            /*catch (ParserConfigurationException e) {
-                if(Mcmd5.debug)
-                    Mcmd5.logger.log(Level.INFO, "parsing failed; returning null");
-            }*/
+
+            return new MD5Model(meshBuilder.build(), jointBuilder.build());
         }
 
         private MD5Mesh parseMesh() {
@@ -105,26 +149,26 @@ public class MD5Model {
                         shader = line.trim().substring("shader \"".length(), line.length() - 1);
                     }
                     else if(line.contains("numverts")) {
-                        int numverts = Integer.parseInt(line.trim().split(" ")[1]);
+                        int numverts = Integer.parseInt(regex.split(line.trim())[1]);
                         verts = new MD5Vertex[numverts];
                     }
                     else if(line.contains("numtris")) {
-                        int numtris = Integer.parseInt(line.trim().split(" ")[1]);
+                        int numtris = Integer.parseInt(regex.split(line.trim())[1]);
                         tris = new MD5Triangle[numtris];
                     }
                     else if(line.contains("numweights")) {
-                        int numweights = Integer.parseInt(line.trim().split(" ")[1]);
+                        int numweights = Integer.parseInt(regex.split(line.trim())[1]);
                         weights = new MD5Weight[numweights];
                     }
                     else if(line.contains("tri")) {
-                        String[] triData = line.trim().split(" ");
+                        String[] triData = regex.split(line.trim());
                         int v1 = Integer.parseInt(triData[2]);
                         int v2 = Integer.parseInt(triData[3]);
                         int v3 = Integer.parseInt(triData[4]);
                         tris[tricount++] = new MD5Triangle(v1, v2, v3);
                     }
                     else if(line.contains("vert")) {
-                        String[] vertData = line.trim().split(" ");
+                        String[] vertData = regex.split(line.trim());
                         float u = Float.parseFloat(vertData[3]);
                         float v = Float.parseFloat(vertData[4]);
                         int weightstart = Integer.parseInt(vertData[6]);
@@ -132,7 +176,7 @@ public class MD5Model {
                         verts[vertcount++] = new MD5Vertex(new Vector2f(u, v), weightstart, numweights);
                     }
                     else if(line.contains("weight")) {
-                        String[] weightData = line.trim().split(" ");
+                        String[] weightData = regex.split(line.trim());
                         int jointIndex = Integer.parseInt(weightData[2]);
                         float bias = Float.parseFloat(weightData[3]);
                         float x = Float.parseFloat(weightData[5]);
@@ -155,7 +199,7 @@ public class MD5Model {
 
             try {
                 for(String line; !(line = bufferedReader.readLine()).contains("}"); jointCount++) {
-                    String[] jointData = line.trim().split(" ");
+                    String[] jointData = regex.split(line.trim());
                     int parent = Integer.parseInt(jointData[1]);
                     float x = Float.parseFloat(jointData[3]);
                     float y = Float.parseFloat(jointData[4]);
@@ -238,9 +282,9 @@ public class MD5Model {
             this.vertices[2] = v3;
         }
 
-        public int getV1() { return vertices[0]; }
-        public int getV2() { return vertices[1]; }
-        public int getV3() { return vertices[2]; }
+        public int getV0() { return vertices[0]; }
+        public int getV1() { return vertices[1]; }
+        public int getV2() { return vertices[2]; }
     }
 
     public static class MD5Vertex {
