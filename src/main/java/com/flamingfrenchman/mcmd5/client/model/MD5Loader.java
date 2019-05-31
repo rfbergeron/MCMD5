@@ -292,10 +292,10 @@ public enum MD5Loader implements ICustomModelLoader {
         private final int flags;
         private final int frames;
         private final float fps;
-        // first int is frame, second int is mesh index
-        private final ImmutableTable<Integer, List<WrappedMesh>, Key> keys;
+        // int is frame, part is the target joint
+        private final ImmutableTable<Integer, IModelPart, Key> keys;
 
-        public Animation(int flags, int frames, float fps, ImmutableTable<Integer, List<WrappedMesh>, Key> keys)
+        public Animation(int flags, int frames, float fps, ImmutableTable<Integer, IModelPart, Key> keys)
         {
             this.flags = flags;
             this.frames = frames;
@@ -318,7 +318,7 @@ public enum MD5Loader implements ICustomModelLoader {
             return fps;
         }
 
-        public ImmutableTable<Integer, List<WrappedMesh>, Key> getKeys()
+        public ImmutableTable<Integer, IModelPart, Key> getKeys()
         {
             return keys;
         }
@@ -330,7 +330,7 @@ public enum MD5Loader implements ICustomModelLoader {
         }
     }
 
-    private static final class Key
+    public static final class Key
     {
         @Nullable
         private final Vector3f pos;
@@ -637,8 +637,9 @@ public enum MD5Loader implements ICustomModelLoader {
                 m.transform(tmpNorm);
                 tmpNorm.scale(biases.get(i));
                 newNorm.add(tmpNorm);
-                newNorm.normalize();
             }
+
+            newNorm.normalize();
 
             return new WrappedVertex(new Vector3f(newPos.x, newPos.y, newPos.z),
                     new Vector3f(newNorm.x, newNorm.y, newNorm.z), this.texCoords, this.joints, this.biases);
@@ -842,16 +843,25 @@ public enum MD5Loader implements ICustomModelLoader {
 
     // use for nodes defined in library_nodes; not sure if animation is hierarchical or
     // also local transforms
-    static final class WrappedJoint implements IJoint {
+    public static final class WrappedJoint implements IJoint {
         private IJoint parent;
         private TRSRTransformation invBindPose;
+        // only used during parsing
+        private int parentIndex;
+        private int startIndex;
+        private byte flags;
 
         public WrappedJoint() {
             this.invBindPose = new TRSRTransformation(new Matrix4f());
         }
 
         public WrappedJoint(Vector3f pos, Quat4f rot) {
-            this.invBindPose = new TRSRTransformation(pos, rot, null, null).inverse();
+            this.invBindPose = new TRSRTransformation(pos, rot, null, null);
+        }
+
+        public WrappedJoint(Vector3f pos, Quat4f rot, IJoint parent) {
+            this(pos, rot);
+            this.parent = parent;
         }
 
         public WrappedJoint(TRSRTransformation invBindPose, IJoint parent) {

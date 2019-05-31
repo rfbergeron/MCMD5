@@ -100,6 +100,11 @@ public class MD5Model {
 
                 bufferedReader.close();
                 bufferedReader = new BufferedReader(new InputStreamReader(animInputStream));
+                MD5AnimJoint[] hierarchy = null;
+                MD5Loader.Key[][] keymat = new MD5Loader.Key[][];
+                ImmutableTable.Builder<Integer, MD5Loader.WrappedJoint, MD5Loader.Key> keys = ImmutableTable.builder();
+                int currentFrame = 0;
+
                 for(String line ; (line = bufferedReader.readLine()) != null; ) {
                     if(line.contains("numFrames")) {
                         numFrames = Integer.parseInt(line.substring("numFrames".length()).trim());
@@ -114,16 +119,18 @@ public class MD5Model {
                         numAnimatedComponents = Integer.parseInt(line.substring("numAnimatedComponents".length()).trim());
                     }
                     else if(line.contains("hierarchy")) {
-
+                        hierarchy = parseAnimJoints(numJoints);
                     }
                     else if(line.contains("bounds")) {
-
+                        parseBounds();
                     }
                     else if(line.contains("baseframe")) {
-
+                        if(hierarchy == null) throw new IOException("MD5 baseframes defined before heierarchy");
+                        parseBaseFrame(hierarchy);
                     }
                     else if(line.contains("frame")) {
-
+                        int frameNum = Integer.parseInt(line.substring("frame ".length()).trim());
+                        parseFrame(frameNum, hierarchy, keys);
                     }
                 }
             }
@@ -132,6 +139,19 @@ public class MD5Model {
             }
 
             return new MD5Model(meshBuilder.build(), jointBuilder.build());
+        }
+
+        private void parseBounds() {
+            String line;
+
+            try {
+                while (!(line = bufferedReader.readLine()).contains("}")) {
+                    // discard for now
+                }
+            }
+            catch (IOException e) {
+
+            }
         }
 
         private MD5Mesh parseMesh() {
@@ -229,6 +249,118 @@ public class MD5Model {
                 orientation.w = -(float) (Math.sqrt(temp));
             }
             return orientation;
+        }
+
+        public MD5AnimJoint[] parseAnimJoints(int numJoints) {
+            MD5AnimJoint[] joints = new MD5AnimJoint[numJoints];
+            int count = 0;
+            String line;
+
+            try {
+                while(!(line = bufferedReader.readLine()).contains("}")) {
+                    String[] tokens = regex.split(line.trim());
+                    int parent = Integer.parseInt(tokens[1]);
+                    byte flags = Byte.parseByte(tokens[2]);
+                    int startIndex = Integer.parseInt(tokens[3]);
+                    joints[count++] = new MD5AnimJoint(tokens[0], parent, flags, startIndex);
+
+                }
+            }
+            catch (IOException e) {
+
+            }
+
+            return joints;
+        }
+
+        public MD5Loader.Key[] parseFrame(int frame, MD5AnimJoint[] joints) {
+            String line;
+            StringBuilder builder = new StringBuilder();
+            MD5Loader.Key[] keys = new MD5Loader.Key[joints.length];
+
+            try {
+                while (!(line = bufferedReader.readLine()).contains("}")) {
+                    builder.append(line);
+                }
+            }
+            catch(IOException e) {
+                return null;
+            }
+
+            String[] frameData = regex.split(builder.toString());
+
+            for(int i = 0 ; i < keys.length ; ++i) {
+                MD5AnimJoint joint = joints[i];
+                byte flags = joint.flags;
+                int startIndex = joint.startIndex;
+                Vector3f position = new Vector3f(joint.pos);
+                Quat4f orientation = new Quat4f(joint.rot);
+
+                if ((flags & 1) > 0) {
+                    position.x = Float.parseFloat(frameData[startIndex++]);
+                }
+                if ((flags & 2) > 0) {
+                    position.y = Float.parseFloat(frameData[startIndex++]);
+                }
+                if ((flags & 4) > 0) {
+                    position.z = Float.parseFloat(frameData[startIndex++]);
+                }
+                if ((flags & 8) > 0) {
+                    orientation.x = Float.parseFloat(frameData[startIndex++]);
+                }
+                if ((flags & 16) > 0) {
+                    orientation.y = Float.parseFloat(frameData[startIndex++]);
+                }
+                if ((flags & 32) > 0) {
+                    orientation.z = Float.parseFloat(frameData[startIndex++]);
+                }
+                // Update Quaternion's w component
+                orientation = calculateQuaternion(orientation.x, orientation.y, orientation.z);
+                keys[i] = new MD5Loader.Key(position, null, orientation);
+            }
+            return keys;
+        }
+
+        public void parseBaseFrame(MD5AnimJoint[] joints) {
+            int jointCount = 0;
+            String line;
+            MD5Loader.WrappedJoint[] wrappedJoints = new MD5Loader.WrappedJoint[joints.length];
+
+            try {
+                while(!(line = bufferedReader.readLine()).contains("}")) {
+                    String[] tokens = regex.split(line.trim());
+                    float vx = Float.parseFloat(tokens[1]);
+                    float vy = Float.parseFloat(tokens[2]);
+                    float vz = Float.parseFloat(tokens[3]);
+                    float nx = Float.parseFloat(tokens[6]);
+                    float ny = Float.parseFloat(tokens[7]);
+                    float nz = Float.parseFloat(tokens[8]);
+                    Vector3f pos = new Vector3f(vx, vy, vz);
+                    Quat4f rot = calculateQuaternion(nx, ny, nz);
+                    joints[jointCount].pos = pos;
+                    joints[jointCount].rot = rot;
+                    ++jointCount;
+                }
+            }
+            catch(IOException e) {
+
+            }
+        }
+    }
+
+    public static class MD5AnimJoint {
+        private String name;
+        private int parent;
+        private byte flags;
+        private int startIndex;
+        private Vector3f pos;
+        private Quat4f rot;
+
+        public MD5AnimJoint(String name, int parent, byte flags, int startIndex) {
+            this.name = name;
+            this.parent = parent;
+            this.flags = flags;
+            this.startIndex = startIndex;
         }
     }
 
