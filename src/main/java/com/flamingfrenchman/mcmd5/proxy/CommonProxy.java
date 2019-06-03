@@ -18,8 +18,9 @@ import java.lang.reflect.Field;
 
 @Mod.EventBusSubscriber
 public class CommonProxy {
-    @GameRegistry.ObjectHolder("mcmd5:test")
-    public static ItemTest TEST = new ItemTest("model", "model");
+
+    @GameRegistry.ObjectHolder(Mcmd5.MODID + ":monster")
+    public static ItemTest TEST = new ItemTest("monster", "monster");
 
     public void preInit(FMLPreInitializationEvent event) {
 
