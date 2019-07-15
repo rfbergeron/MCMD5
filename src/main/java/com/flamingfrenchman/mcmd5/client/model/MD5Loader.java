@@ -434,8 +434,7 @@ public enum MD5Loader implements ICustomModelLoader {
             this.transforms = buildTransforms(model.getTransforms());
         }
 
-        private static ImmutableMap<String, ResourceLocation> buildTextures(ResourceLocation modelLocation,
-                                                                            ImmutableList<MD5Model.MD5Mesh> meshes)
+        private static ImmutableMap<String, ResourceLocation> buildTextures(ResourceLocation modelLocation, ImmutableList<MD5Model.MD5Mesh> meshes)
         {
             ImmutableMap.Builder<String, ResourceLocation> builder = ImmutableMap.builder();
 
@@ -489,13 +488,12 @@ public enum MD5Loader implements ICustomModelLoader {
                     MD5Model.MD5Joint joint = joints.get(weight.getJointIndex());
 
                     Vector3f weightPos = weight.getPos();
-                    Vector3f scaledPos = new Vector3f(joint.getPos());
-                    scaledPos.scale(weight.getBias());
                     //extend pos to quat so it can be rotated
                     //Quat4f rotatedPos = joint.getRot();
-                    Matrix4f m = new Matrix4f(joint.getRot(), scaledPos, 1.0F);
+                    Matrix4f m = new Matrix4f(joint.getRot(), joint.getPos(), 1.0F);
                     Vector4f acumPos = new Vector4f(weightPos.x, weightPos.y, weightPos.z, 1);
                     m.transform(acumPos);
+                    acumPos.scale(weight.getBias());
                     vertex.addToPos(new Vector3f(acumPos.x, acumPos.y, acumPos.z));
                     //rotatedPos.mul(new Quat4f(weightPos.x, weightPos.y, weightPos.z, 0));
                     //Quat4f conj = joint.getRot();

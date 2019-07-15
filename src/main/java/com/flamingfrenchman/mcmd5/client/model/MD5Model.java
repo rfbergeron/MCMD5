@@ -201,7 +201,7 @@ public class MD5Model {
                 while((line = bufferedReader.readLine()) != null) {
                     if(line.isEmpty()) continue;
                     if(line.contains("shader")) {
-                        shader = line.trim().substring("shader \"".length(), line.length() - 1);
+                        shader = line.trim().substring("shader \"".length(), line.length() - 2);
                         if(shader.endsWith(".png")) shader = shader.substring(0, shader.length() - ".png".length());
                     }
                     if(line.contains("numverts")) {
@@ -209,7 +209,7 @@ public class MD5Model {
                         log("\treading " + numverts + "vertices");
                         verts = new MD5Vertex[numverts];
                         while ((line = bufferedReader.readLine()).contains("vert")) {
-                            if(line.startsWith("//")) continue;
+                            if(line.trim().startsWith("//") || line.isEmpty()) continue;
                             if(line.contains("//")) line = line.split("//")[0];
                             String[] vertData = regex.split(line.trim());
 
@@ -226,7 +226,7 @@ public class MD5Model {
                         log("\treading " + numtris + "triangles");
                         tris = new MD5Triangle[numtris];
                         while ((line = bufferedReader.readLine()).contains("tri")) {
-                            if(line.startsWith("//")) continue;
+                            if(line.trim().startsWith("//") || line.isEmpty()) continue;
                             if(line.contains("//")) line = line.split("//")[0];
                             String[] triData = regex.split(line.trim());
 
@@ -242,7 +242,7 @@ public class MD5Model {
                         log("\treading " + numweights + "weights");
                         weights = new MD5Weight[numweights];
                         while ((line = bufferedReader.readLine()).contains("weight")) {
-                            if(line.startsWith("//")) continue;
+                            if(line.trim().startsWith("//") || line.isEmpty()) continue;
                             if(line.contains("//")) line = line.split("//")[0];
                             String[] weightData = regex.split(line.trim());
 
@@ -277,7 +277,7 @@ public class MD5Model {
             try {
                 String line;
                 while(!(line = bufferedReader.readLine()).contains("}")) {
-                    if(line.startsWith("//")) continue;
+                    if(line.trim().startsWith("//") || line.isEmpty()) continue;
                     if(line.contains("//")) line = line.split("//")[0];
                     String[] jointData = regex.split(line.trim());
 
@@ -288,7 +288,6 @@ public class MD5Model {
                     float qx = Float.parseFloat(jointData[8]);
                     float qy = Float.parseFloat(jointData[9]);
                     float qz = Float.parseFloat(jointData[10]);
-                    //TODO: calculate quaternion w
                     joints[jointCount++] = new MD5Joint(jointData[0], parent,
                             new Vector3f(x, y, z), calculateQuaternion(qx, qy, qz));
                 }

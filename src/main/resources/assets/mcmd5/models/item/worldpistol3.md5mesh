@@ -17,9 +17,10 @@ numTransforms 3
 // parentheses must be separated from each other, the vector components and
 // the transform name by at least one space.
 //
+// the following are approximate:
 // x axis runs from left to right across the screen
-// z axis runs from bottom to top across the screen
 // y axis runs positively into the screen
+// z axis runs from bottom to top across the screen
 
 transforms {
   "third_person_right_hand" ( 0 0 0 ) ( 0 0 0 ) ( 0.1 0.1 0.1 )
