@@ -3,6 +3,13 @@ commandline "mesh models/monsters/hellknight/cycles/hellknight_mesh.mb -dest mod
 
 numJoints 110
 numMeshes 4
+numTransforms 3
+
+transforms {
+  "third_person_right_hand" ( 4 0 0 ) ( 0 0 0 ) ( 0.05 0.05 0.05 )
+  "first_person_right_hand" ( 0 2 0 ) ( 0 0 0 ) ( 0.05 0.05 0.05 )
+  "gui" ( 0 0 0 ) ( 0 0 0 ) ( 0.01 0.01 0.01 )
+}
 
 joints {
 	"origin"	-1 ( 0 0 0 ) ( -0.7071067095 0 0 )		// 
@@ -119,7 +126,7 @@ joints {
 
 mesh {
 	// meshes: hellknightmesh
-	shader "/textures/monster/hellknight.png"
+	shader "mcmd5:monster/hellknight"
 
 	numverts 1656
 	vert 0 ( 0.0306090005 0.6130819917 ) 0 2
@@ -7618,7 +7625,7 @@ mesh {
 
 mesh {
 	// meshes: salivamesh
-	shader "/textures/monster/gob2.png"
+	shader "mcmd5:monster/gob2"
 
 	numverts 14
 	vert 0 ( 0.6911731958 0.0044568777 ) 5 1
@@ -7677,7 +7684,7 @@ mesh {
 
 mesh {
 	// meshes: droolmesh
-	shader "/textures/monster/gob.png"
+	shader "mcmd5:monster/gob"
 
 	numverts 33
 	vert 0 ( 0.715780139 0.2972531319 ) 4 1
@@ -7842,7 +7849,7 @@ mesh {
 
 mesh {
 	// meshes: tonguemesh
-	shader "/textures/monster/tongue.png"
+	shader "mcmd5:monster/tongue"
 
 	numverts 34
 	vert 0 ( 0.1569895446 0.8344357014 ) 2 3

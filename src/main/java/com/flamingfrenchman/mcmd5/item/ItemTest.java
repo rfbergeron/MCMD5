@@ -18,6 +18,7 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import org.apache.logging.log4j.Level;
 
+import javax.jws.WebParam;
 import java.util.List;
 import java.util.Random;
 
@@ -31,34 +32,11 @@ public class ItemTest extends Item {
     @SideOnly(Side.CLIENT)
     public void initModel() {
         Mcmd5.logger.log(Level.INFO, "initializing model");
+        /*ModelLoader.setCustomModelResourceLocation(this, 0,
+                new ModelResourceLocation(getRegistryName().toString() + ".md5mesh", null));*/
+        /*ModelLoader.setCustomModelResourceLocation(this, 0,
+                new ModelResourceLocation(getRegistryName().toString(), "inventory"));*/
         ModelLoader.setCustomModelResourceLocation(this, 0,
-                new ModelResourceLocation(getRegistryName() + ".md5mesh", "inventory"));
-    }
-
-    public ActionResult<ItemStack> onItemRightClick(World worldIn, EntityPlayer playerIn, EnumHand handIn)
-    {
-        if(worldIn.isRemote) {
-            IBakedModel model = Minecraft.getMinecraft().getRenderItem().getItemModelMesher().getItemModel(playerIn.getHeldItem(handIn));
-            List<BakedQuad> quads = model.getQuads(null, null, new Random().nextLong());
-            for(BakedQuad quad : quads) {
-                UnpackedBakedQuad unpackedBakedQuad = (UnpackedBakedQuad) quad;
-                try {
-                    float[][][] data = (float[][][]) Mcmd5.quadData.get(unpackedBakedQuad);
-                    for(int v = 0 ; v < data.length ; ++v) {
-                        Mcmd5.logger.log(Level.INFO, "Vertex number " + v);
-                        for(int e = 0 ; e < data[v].length ; ++e) {
-                            Mcmd5.logger.log(Level.INFO, "\tEntry number " + e);
-                            for (int d = 0 ; d < data[v][e].length ; ++d) {
-                                Mcmd5.logger.log(Level.INFO, "\t\t" + data[v][e][d]);
-                            }
-                        }
-                    }
-                }
-                catch (IllegalAccessException e) {
-                    Mcmd5.logger.log(Level.ERROR, "oof");
-                }
-            }
-        }
-        return new ActionResult<ItemStack>(EnumActionResult.PASS, playerIn.getHeldItem(handIn));
+                new ModelResourceLocation("mcmd5:monster.md5mesh", null));
     }
 }

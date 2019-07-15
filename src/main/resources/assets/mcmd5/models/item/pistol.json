@@ -1,0 +1,25 @@
+{
+	"parent": "mcmd5:item/worldpistol.md5mesh",
+	"display": {
+        	"ground": {
+            		"rotation": [ 0, 0, 0 ],
+            		"translation": [ 0, 3, 0 ],
+            		"scale": [ 1, 1, 1 ]
+        	},
+        	"fixed": {
+            		"rotation": [ 0, 90, 0 ],
+            		"translation": [ -0.5, 10, 0 ],
+            		"scale": [ 2, 2, 2 ]
+        	},
+        	"thirdperson_righthand": {
+            		"rotation": [ 75, 0, 0 ],
+            		"translation": [ 0, 10, 4 ],
+            		"scale": [ 1, 1, 1 ]
+        	},
+		"firstperson_righthand": {
+            		"rotation": [ 0, 90, 0 ],
+            		"translation": [ -3.5, 7.5, 3 ],
+            		"scale": [ 0.2, 0.2, 0.2 ]
+        	}
+    	}
+}

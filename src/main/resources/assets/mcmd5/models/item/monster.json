@@ -1,0 +1,11 @@
+{
+
+  "parent": "minecraft:item/generated",
+
+  "textures": {
+
+    "layer0": "mcmd5:items/monster"
+
+  }
+
+}

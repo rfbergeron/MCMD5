@@ -26,27 +26,11 @@ public class Mcmd5
     public static CommonProxy proxy;
 
     public static Logger logger;
-    public static Field quadData;
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         logger = event.getModLog();
         proxy.preInit(event);
-        try {
-            quadData = UnpackedBakedQuad.class.getDeclaredField("unpackedData");
-            quadData.setAccessible(true);
-            logger.log(Level.INFO, "Field was set accessible");
-
-            Field modifiersField = Field.class.getDeclaredField("modifiers");
-            modifiersField.setAccessible(true);
-            modifiersField.setInt(quadData, quadData.getModifiers() & ~Modifier.FINAL);
-        }
-        catch (NoSuchFieldException e) {
-            logger.log(Level.ERROR, "Could not find unpackedData field for class UnpackedBakedQuad");
-        }
-        catch (IllegalAccessException e) {
-            logger.log(Level.ERROR, "Something went wrong with UnpackedBakedQuad");
-        }
     }
 
     @Mod.EventHandler
