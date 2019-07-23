@@ -5,15 +5,19 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.IBakedModel;
 import net.minecraft.client.renderer.block.model.ModelResourceLocation;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumHand;
 import net.minecraft.world.World;
 import net.minecraftforge.client.model.ModelLoader;
 import net.minecraftforge.client.model.pipeline.UnpackedBakedQuad;
+import net.minecraftforge.common.model.IModelState;
+import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import org.apache.logging.log4j.Level;
@@ -27,6 +31,21 @@ public class ItemTest extends Item {
     public ItemTest(String regName, String unlocalName) {
         setRegistryName(regName);
         setUnlocalizedName(Mcmd5.MODID + "." + unlocalName);
+    }
+
+    public void onUpdate(ItemStack stack, World worldIn, Entity entityIn, int itemSlot, boolean isSelected)
+    {
+        NBTTagCompound tagCompound = stack.getTagCompound();
+        if(tagCompound != null) {
+            int frame = tagCompound.getInteger("frame");
+            if(frame > 100) frame = -1;
+            tagCompound.setInteger("frame", frame + 1);
+        }
+        else {
+            tagCompound = new NBTTagCompound();
+            tagCompound.setInteger("frame", 0);
+            stack.setTagCompound(tagCompound);
+        }
     }
 
     @SideOnly(Side.CLIENT)

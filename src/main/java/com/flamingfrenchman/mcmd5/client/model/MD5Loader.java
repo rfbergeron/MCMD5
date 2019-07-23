@@ -8,8 +8,10 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableTable;
+import com.google.common.collect.Table;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.IBakedModel;
 import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
@@ -18,10 +20,13 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.client.resources.IResource;
 import net.minecraft.client.resources.IResourceManager;
-import net.minecraft.item.Item;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.World;
 import net.minecraftforge.client.model.*;
 import net.minecraftforge.client.model.pipeline.UnpackedBakedQuad;
 import net.minecraftforge.common.model.IModelPart;
@@ -36,6 +41,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.logging.log4j.Level;
+import scala.Int;
 
 import javax.annotation.Nullable;
 import javax.vecmath.*;
@@ -122,7 +128,7 @@ public enum MD5Loader implements ICustomModelLoader {
 
         MD5Model model = cache.get(file);
         if(model == null) throw new ModelLoaderRegistry.LoaderException("Error loading model previously: " + file);
-        return new ModelWrapper(modelLocation, model, null, true, true, 0);
+        return new ModelWrapper(modelLocation, model, true, true, 0);
     }
 
     /*
@@ -299,7 +305,6 @@ public enum MD5Loader implements ICustomModelLoader {
                 TRSRTransformation invBind = ((IJoint) part).getInvBindPose();
                 ret = ret.compose(invBind);
             }
-
             return ret;
         }
     }
@@ -339,6 +344,9 @@ public enum MD5Loader implements ICustomModelLoader {
             this.frames = frames;
             this.fps = fps;
             this.keys = keys;
+            /*for(Table.Cell<Integer, IModelPart, Key> cell: keys.cellSet()) {
+                log("frame: " + cell.getRowKey().toString() + " part: " + cell.getColumnKey().toString() + "parent: " + ((IJoint) cell.getColumnKey()).getParent() + " key: " + cell.getValue().toString());
+            }*/
         }
 
         public int getFlags()
@@ -359,12 +367,6 @@ public enum MD5Loader implements ICustomModelLoader {
         public ImmutableTable<Integer, IModelPart, Key> getKeys()
         {
             return keys;
-        }
-
-        @Override
-        public String toString()
-        {
-            return String.format("Animation [flags=%s, frames=%s, fps=%s, keys=...]", flags, frames, fps);
         }
     }
 
@@ -413,25 +415,40 @@ public enum MD5Loader implements ICustomModelLoader {
         private final ResourceLocation modelLocation;
         private final MD5Model model;
         private final ImmutableList<WrappedMesh> meshes;
-        private ImmutableList<WrappedJoint> animJoints;
         private final ImmutableMap<String, ResourceLocation> textures;
         private final ImmutableMap<ItemCameraTransforms.TransformType, TRSRTransformation> transforms;
+        private final IModelState state;
         private final boolean smooth;
         private final boolean gui3d;
         private final int defaultKey;
+        private ImmutableList<WrappedJoint> joints;
 
-        public ModelWrapper(ResourceLocation modelLocation, MD5Model model, ImmutableList<WrappedJoint> animJoints,
+        /*public ModelWrapper(ResourceLocation modelLocation, MD5Model model, ImmutableList<WrappedJoint> animJoints,
                             boolean smooth, boolean gui3d, int defaultKey)
         {
             this.modelLocation = modelLocation;
             this.model = model;
-            this.animJoints = animJoints;
+            this.joints = animJoints;
             this.smooth = smooth;
             this.gui3d = gui3d;
             this.defaultKey = defaultKey;
             this.textures = buildTextures(modelLocation, model.getMeshes());
             this.meshes = process(model, animJoints);
             this.transforms = buildTransforms(model.getTransforms());
+            this.state = buildState(model.getFrames(), joints);
+        }*/
+
+        public ModelWrapper(ResourceLocation modelLocation, MD5Model model, boolean smooth, boolean gui3d, int defaultKey) {
+            this.modelLocation = modelLocation;
+            this.model = model;
+            this.joints = model.getAnimJoints() == null ? null : buildJoints(model.getAnimJoints());
+            this.smooth = smooth;
+            this.gui3d = gui3d;
+            this.defaultKey = defaultKey;
+            this.textures = buildTextures(modelLocation, model.getMeshes());
+            this.meshes = process(model, joints);
+            this.transforms = buildTransforms(model.getTransforms());
+            this.state = buildState(model.getFrames(), joints, transforms);
         }
 
         private static ImmutableMap<String, ResourceLocation> buildTextures(ResourceLocation modelLocation, ImmutableList<MD5Model.MD5Mesh> meshes)
@@ -466,8 +483,7 @@ public enum MD5Loader implements ICustomModelLoader {
             return builder.build();
         }
 
-        private static WrappedMesh generateWrappedMesh(ImmutableList<MD5Model.MD5Joint> joints, MD5Model.MD5Mesh mesh,
-                                                       ImmutableList<WrappedJoint> animJoints) {
+        private static WrappedMesh generateWrappedMesh(ImmutableList<MD5Model.MD5Joint> joints, MD5Model.MD5Mesh mesh, ImmutableList<WrappedJoint> animJoints) {
             log("generating wrapped mesh");
             MD5Model.MD5Vertex[] vertices = mesh.getVertices();
             MD5Model.MD5Weight[] weights = mesh.getWeights();
@@ -495,15 +511,6 @@ public enum MD5Loader implements ICustomModelLoader {
                     m.transform(acumPos);
                     acumPos.scale(weight.getBias());
                     vertex.addToPos(new Vector3f(acumPos.x, acumPos.y, acumPos.z));
-                    //rotatedPos.mul(new Quat4f(weightPos.x, weightPos.y, weightPos.z, 0));
-                    //Quat4f conj = joint.getRot();
-                    //conj.conjugate();
-                    //rotatedPos.mul(conj);
-                    //Vector3f posVec = new Vector3f(rotatedPos.x, rotatedPos.y, rotatedPos.z);
-                    //Vector3f acumPos = new Vector3f(joint.getPos());
-                    //acumPos.add(posVec);
-                    //acumPos.scale(weight.getBias());
-                    //vertex.addToPos(acumPos);
                 }
             }
 
@@ -533,22 +540,25 @@ public enum MD5Loader implements ICustomModelLoader {
                 v2.addToNorm(normal);
             }
 
+            log("computing bindings for mesh");
             for(MD5Model.MD5Vertex vertex : vertices) {
+                // remember to normalize
                 vertex.getNorm().normalize();
                 ImmutableList.Builder<WrappedJoint> boundJoints = ImmutableList.builder();
                 ImmutableList.Builder<Float> boundBiases = ImmutableList.builder();
-                int weightStart = vertex.getNumweights();
+                int weightStart = vertex.getWeightStart();
                 int numWeights = vertex.getNumweights();
-                
+                log("   begin vertex");
                 for(int i = 0 ; i < numWeights ; ++i) {
                     if(animJoints != null) {
                         MD5Model.MD5Weight w = weights[weightStart + i];
                         boundJoints.add(animJoints.get(w.getJointIndex()));
                         boundBiases.add(w.getBias());
+                        log("\tweight " + (weightStart + i) + " joint: " + animJoints.get(w.getJointIndex()).name);
                     }
                 }
 
-                log(vertex.toString());
+                //log(vertex.toString());
                 vertexBuilder.add(new WrappedVertex(vertex.getPos(), vertex.getNorm(), vertex.getTexCoords(),
                         boundJoints.build(), boundBiases.build()));
             }
@@ -556,11 +566,36 @@ public enum MD5Loader implements ICustomModelLoader {
             return new WrappedMesh(mesh.getTexture(), vertexBuilder.build(), triangleBuilder.build());
         }
 
-        /*private static String getLocation(String path)
-        {
-            if(path.endsWith(".png")) path = path.substring(0, path.length() - ".png".length());
-            return path;
-        }*/
+        private static ImmutableList<WrappedJoint> buildJoints(ImmutableList<MD5Model.MD5AnimJoint> animJoints) {
+            WrappedJoint[] wrappedJoints = new WrappedJoint[animJoints.size()];
+            ImmutableList.Builder<WrappedJoint> builder = ImmutableList.builder();
+
+            for(int i = 0 ; i < animJoints.size() ; ++i) {
+                MD5Model.MD5AnimJoint animJoint = animJoints.get(i);
+                if(animJoint.getParent() > -1)
+                    wrappedJoints[i] = new WrappedJoint(animJoint.getPos(), animJoint.getRot(), wrappedJoints[animJoint.getParent()], animJoint.getName());
+                else
+                    wrappedJoints[i] = new WrappedJoint(animJoint.getPos(), animJoint.getRot(), null, animJoint.getName());
+
+                log("joint: " + i + " " + animJoint.getName() + " rot: " + animJoint.getRot() + " pos: " + animJoint.getPos());
+            }
+
+            return builder.add(wrappedJoints).build();
+        }
+
+        private static IModelState buildState(ImmutableList<MD5Model.MD5Frame> frames, ImmutableList<WrappedJoint> joints, ImmutableMap<ItemCameraTransforms.TransformType, TRSRTransformation> transforms) {
+            if(joints == null) return new StaticState(transforms);
+
+            ImmutableTable.Builder<Integer, IModelPart, Key> keys = ImmutableTable.builder();
+            for(MD5Model.MD5Frame frame : frames) {
+                Vector3f[] positions = frame.getPositions();
+                Quat4f[] orientations = frame.getOrientations();
+                for(int i = 0 ; i < joints.size() ; ++i) {
+                    keys.put(frame.getNumber(), joints.get(i), new Key(positions[i], null, orientations[i]));
+                }
+            }
+            return new MD5State(new Animation(0, frames.size(), 24, keys.build()), 0);
+        }
 
         public Collection<ResourceLocation> getTextures() {
             ImmutableList.Builder<ResourceLocation> locationBuilder = ImmutableList.builder();
@@ -594,11 +629,11 @@ public enum MD5Loader implements ICustomModelLoader {
                 }
             }
             builder.put("missingno", missing);
-            return new BakedWrapper(meshes, model.getJoints(), state, smooth, gui3d, format, builder.build());
+            return new BakedWrapper(meshes, state, smooth, gui3d, format, builder.build(), transforms);
         }
 
         public IModelState getDefaultState() {
-            return new StaticState(this.transforms);
+            return this.state;
         }
 
         public Optional<? extends IClip> getClip(String name) {
@@ -683,18 +718,12 @@ public enum MD5Loader implements ICustomModelLoader {
         }
 
         public WrappedVertex bake(Function<WrappedJoint, Matrix4f> animator) {
-            Matrix4f t = animator.apply(null);
-            Vector4f newPos = new Vector4f(this.pos);
-            newPos.w = 1;
-            t.transform(newPos);
-            Vector4f newNorm = new Vector4f(this.norm);
-            t.transform(newNorm);
-            //log("pre bake: " + toString());
+            Vector4f newPos = new Vector4f(0, 0, 0, 1);
+            Vector4f newNorm = new Vector4f();
 
             //this isnt working
-            /*for(int i = 0 ; i < joints.size() ; ++i) {
+            for(int i = 0 ; i < joints.size() ; ++i) {
                 Matrix4f m = animator.apply(joints.get(i));
-                log("transform is " + m.toString());
 
                 Vector4f tmpPos = new Vector4f(this.pos);
                 tmpPos.w = 1;
@@ -704,19 +733,16 @@ public enum MD5Loader implements ICustomModelLoader {
                 newPos.add(tmpPos);
 
                 Vector4f tmpNorm = new Vector4f(this.norm);
-                tmpNorm.w = 0;
 
                 m.transform(tmpNorm);
                 tmpNorm.scale(biases.get(i));
                 newNorm.add(tmpNorm);
-            }*/
+            }
 
-            newNorm.normalize();
+            Vector3f ret = new Vector3f(newNorm.x, newNorm.y, newNorm.z);
+            ret.normalize();
             return new WrappedVertex(new Vector3f(newPos.x, newPos.y, newPos.z),
-                    new Vector3f(newNorm.x, newNorm.y, newNorm.z), this.texCoords, this.joints, this.biases);
-
-            //will worry about handling animation later
-            //return this;
+                    ret, this.texCoords, this.joints, this.biases);
         }
 
         public String toString() {
@@ -727,14 +753,21 @@ public enum MD5Loader implements ICustomModelLoader {
     public static final class WrappedJoint implements IJoint {
         private IJoint parent;
         private TRSRTransformation invBindPose;
+        private String name;
 
         public WrappedJoint(Vector3f pos, Quat4f rot) {
             this.invBindPose = new TRSRTransformation(pos, rot, null, null).inverse();
+            this.parent = null;
         }
 
         public WrappedJoint(Vector3f pos, Quat4f rot, IJoint parent) {
             this(pos, rot);
             this.parent = parent;
+        }
+
+        public WrappedJoint(Vector3f pos, Quat4f rot, IJoint parent, String name) {
+            this(pos, rot, parent);
+            this.name = name;
         }
 
         public WrappedJoint(TRSRTransformation invBindPose, IJoint parent) {
@@ -749,6 +782,10 @@ public enum MD5Loader implements ICustomModelLoader {
         public Optional<? extends IJoint> getParent() {
             return parent == null ? Optional.empty() : Optional.of(parent);
         }
+
+        public String toString() {
+            return this.name;
+        }
     }
 
     private static final class BakedWrapper implements IBakedModel {
@@ -759,15 +796,18 @@ public enum MD5Loader implements ICustomModelLoader {
         private final VertexFormat format;
         private final ImmutableMap<String, TextureAtlasSprite> textures;
         private ImmutableList<BakedQuad> quads;
+        private ImmutableMap<ItemCameraTransforms.TransformType, TRSRTransformation> transforms;
 
-        public BakedWrapper(ImmutableList<WrappedMesh> meshes, ImmutableList<MD5Model.MD5Joint> joints, IModelState state,
-                            boolean smooth, boolean gui3d, VertexFormat format, ImmutableMap<String, TextureAtlasSprite> textures) {
+        public BakedWrapper(ImmutableList<WrappedMesh> meshes, IModelState state,
+                            boolean smooth, boolean gui3d, VertexFormat format, ImmutableMap<String, TextureAtlasSprite> textures,
+                            ImmutableMap<ItemCameraTransforms.TransformType, TRSRTransformation> transforms) {
             this.meshes = meshes;
             this.state = state;
             this.smooth = smooth;
             this.gui3d = gui3d;
             this.format = format;
             this.textures = textures;
+            this.transforms = transforms;
         }
 
         @Override
@@ -838,7 +878,7 @@ public enum MD5Loader implements ICustomModelLoader {
                     @Override
                     public Matrix4f apply(WrappedJoint j)
                     {
-                        return global.getMatrix()/*.compose(localCache.getUnchecked(j)).getMatrix()*/;
+                        return global.compose(localCache.getUnchecked(j)).getMatrix();
                     }
                 });
                     
@@ -927,16 +967,40 @@ public enum MD5Loader implements ICustomModelLoader {
         @Override
         public Pair<? extends IBakedModel, Matrix4f> handlePerspective(ItemCameraTransforms.TransformType cameraTransformType)
         {
-            return PerspectiveMapWrapper.handlePerspective(this, state, cameraTransformType);
+            return PerspectiveMapWrapper.handlePerspective(this, transforms, cameraTransformType);
         }
 
         @Override
         public ItemOverrideList getOverrides()
         {
             // TODO handle items
-            return ItemOverrideList.NONE;
+            return BakedMD5ModelOverrideHandler.INSTANCE;
         }
     }
 
+    private static final class BakedMD5ModelOverrideHandler extends ItemOverrideList {
+        public static final BakedMD5ModelOverrideHandler INSTANCE = new BakedMD5ModelOverrideHandler();
+        private BakedMD5ModelOverrideHandler() {
+            super(ImmutableList.of());
+        }
+
+        @Override
+        public IBakedModel handleItemState(IBakedModel originalModel, ItemStack stack, @Nullable World world, @Nullable EntityLivingBase entity)
+        {
+            BakedWrapper model = (BakedWrapper) originalModel;
+            if(model.state instanceof MD5State) {
+                MD5State md5State = (MD5State) model.state;
+                NBTTagCompound tag = stack.getTagCompound();
+                if(tag != null) {
+                    float partialTicks = Minecraft.getMinecraft().getRenderPartialTicks();
+                    int frame = tag.getInteger("frame");
+                    MD5State newState = new MD5State(md5State.animation, frame, frame + 1, partialTicks);
+                    return new BakedWrapper(((BakedWrapper) originalModel).meshes, newState, true, true,
+                            ((BakedWrapper) originalModel).format, ((BakedWrapper) originalModel).textures, ((BakedWrapper) originalModel).transforms);
+                }
+            }
+            return originalModel;
+        }
+    }
 }
 
