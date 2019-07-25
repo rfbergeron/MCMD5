@@ -4,6 +4,7 @@ commandline ""
 numJoints 6
 numMeshes 3
 numTransforms 3
+anim "models/item/pistol_idle.md5anim"
 
 // This is not a part of the official MD5 spec. If you want to change the global model transform
 // based on the camera perspective, you need to add these lines to the mesh file manually.

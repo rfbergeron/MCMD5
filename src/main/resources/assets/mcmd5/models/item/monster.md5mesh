@@ -7,7 +7,7 @@ numTransforms 3
 
 transforms {
   "third_person_right_hand" ( 0 0 0 ) ( 0 0 0 ) ( 0.05 0.05 0.05 )
-  "first_person_right_hand" ( 0.35 0.5 .5 ) ( -90 0 180 ) ( 0.005 0.005 0.005 )
+  "first_person_right_hand" ( 0.35 1 .5 ) ( -90 0 180 ) ( 0.005 0.005 0.005 )
   "gui" ( 0 0 0 ) ( 0 0 0 ) ( 0.01 0.01 0.01 )
 }
 

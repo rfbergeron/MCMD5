@@ -101,9 +101,10 @@ public class MD5Model {
             ImmutableList.Builder<MD5Joint> jointBuilder = ImmutableList.builder();
             ImmutableList.Builder<MD5Transform> transformBuilder = ImmutableList.builder();
             int meshcount = 0;
+            String anim = null;
 
             if(Mcmd5.debug)
-                Mcmd5.logger.log(Level.INFO, "Parsing");
+                Mcmd5.logger.log(Level.INFO, "Parsing " + location.toString());
             try{
                 bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
 
@@ -120,6 +121,9 @@ public class MD5Model {
                     }
                     else if(line.contains("numTransforms")) {
                         numTransforms = Integer.parseInt(line.substring("numTransforms".length()).trim());
+                    }
+                    else if(line.contains("anim")) {
+                        anim = line.trim().substring("anim \"".length(), line.length() - 1);
                     }
                     else if(line.contains("mesh")) {
                         MD5Mesh mesh = parseMesh();
@@ -138,6 +142,8 @@ public class MD5Model {
             finally {
                 bufferedReader.close();
             }
+
+            if(anim != null) animInputStream = manager.getResource(new ResourceLocation(location.getResourceDomain(), anim)).getInputStream();
 
             if(animInputStream == null)
                 return new MD5Model(meshBuilder.build(), jointBuilder.build(), transformBuilder.build());
@@ -216,7 +222,7 @@ public class MD5Model {
                 while((line = bufferedReader.readLine()) != null) {
                     if(line.isEmpty()) continue;
                     if(line.contains("shader")) {
-                        shader = line.trim().substring("shader \"".length(), line.length() - 2);
+                        shader = line.trim().substring("shader \"".length()).replace("\"", "");
                         if(shader.endsWith(".png")) shader = shader.substring(0, shader.length() - ".png".length());
                     }
                     if(line.contains("numverts")) {
@@ -395,6 +401,10 @@ public class MD5Model {
 
             String[] frameData = regex.split(s.toString());
 
+            for(String s1 : frameData) {
+                log("frame data: " + s1);
+            }
+
             for(int i = 0 ; i < joints.size() ; ++i) {
                 MD5AnimJoint joint = joints.get(i);
                 byte flags = joint.flags;
@@ -433,7 +443,6 @@ public class MD5Model {
         public void parseBaseFrame(ImmutableList<MD5AnimJoint> joints) {
             int jointCount = 0;
             String line;
-            MD5Loader.WrappedJoint[] wrappedJoints = new MD5Loader.WrappedJoint[joints.size()];
 
             try {
                 while(!(line = bufferedReader.readLine()).contains("}")) {

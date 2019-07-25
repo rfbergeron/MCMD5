@@ -33,12 +33,13 @@ public class ItemTest extends Item {
         setUnlocalizedName(Mcmd5.MODID + "." + unlocalName);
     }
 
+    @Override
     public void onUpdate(ItemStack stack, World worldIn, Entity entityIn, int itemSlot, boolean isSelected)
     {
         NBTTagCompound tagCompound = stack.getTagCompound();
         if(tagCompound != null) {
             int frame = tagCompound.getInteger("frame");
-            if(frame > 100) frame = -1;
+            if(frame > 119) frame = -1;
             tagCompound.setInteger("frame", frame + 1);
         }
         else {
@@ -46,6 +47,12 @@ public class ItemTest extends Item {
             tagCompound.setInteger("frame", 0);
             stack.setTagCompound(tagCompound);
         }
+    }
+
+    @Override
+    public boolean shouldCauseReequipAnimation(ItemStack oldStack, ItemStack newStack, boolean slotChanged)
+    {
+        return newStack.getItem().equals(oldStack.getItem());
     }
 
     @SideOnly(Side.CLIENT)
