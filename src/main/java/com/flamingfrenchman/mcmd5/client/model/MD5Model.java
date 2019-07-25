@@ -401,9 +401,9 @@ public class MD5Model {
 
             String[] frameData = regex.split(s.toString());
 
-            for(String s1 : frameData) {
+            /*for(String s1 : frameData) {
                 log("frame data: " + s1);
-            }
+            }*/
 
             for(int i = 0 ; i < joints.size() ; ++i) {
                 MD5AnimJoint joint = joints.get(i);

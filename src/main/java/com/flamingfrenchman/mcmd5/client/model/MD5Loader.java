@@ -333,9 +333,9 @@ public enum MD5Loader implements ICustomModelLoader {
             this.frames = frames;
             this.fps = fps;
             this.keys = keys;
-            for(Table.Cell<Integer, IModelPart, Key> cell: keys.cellSet()) {
+            /*for(Table.Cell<Integer, IModelPart, Key> cell: keys.cellSet()) {
                 log("frame: " + cell.getRowKey().toString() + " part: " + cell.getColumnKey().toString() + "parent: " + ((IJoint) cell.getColumnKey()).getParent() + " key: " + cell.getValue().toString());
-            }
+            }*/
         }
 
         public int getFlags()
